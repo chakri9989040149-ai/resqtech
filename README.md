@@ -1,8 +1,8 @@
 # FloodGuard AI — Distributed Flood Warning & Drainage Blockage Detection
 
 > **Official Government Incident & Warning Command System**  
-> **Repository:** [https://github.com/chakri9989040149-ai/flood-drainage-monitoring](https://github.com/chakri9989040149-ai/flood-drainage-monitoring)  
-> **Live Website:** [https://chakri9989040149-ai.github.io/flood-drainage-monitoring/](https://chakri9989040149-ai.github.io/flood-drainage-monitoring/)  
+> **Repository:** [https://github.com/chakri9989040149-ai/resqtech](https://github.com/chakri9989040149-ai/resqtech)  
+> **Live Website:** [https://chakri9989040149-ai.github.io/resqtech/](https://chakri9989040149-ai.github.io/resqtech/)  
 
 ---
 
@@ -53,8 +53,8 @@ FloodGuard AI provides real-time telemetry, automated risk evaluation, multi-cha
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/chakri9989040149-ai/flood-drainage-monitoring.git
-   cd flood-drainage-monitoring
+   git clone https://github.com/chakri9989040149-ai/resqtech.git
+   cd resqtech
    ```
 
 2. **Install dependencies:**
