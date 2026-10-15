@@ -2,147 +2,33 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useAuth } from './AuthContext';
 
 const FloodGuardContext = createContext(null);
-const STORAGE_KEY = 'sensaflow_master_store_v4';
-const LEGACY_STORAGE_KEY = 'floodguard_master_store_v4';
+const STORAGE_KEY = 'sensaflow_master_store_v5';
+const LEGACY_STORAGE_KEY = 'sensaflow_master_store_v4';
 
 // Initial Seeds with coordinates for Map and Dual-Sensor telemetry
 const INITIAL_DRAIN_NODES = [
   {
-    id: 'NODE-C-08',
-    name: 'Culvert Line C-8',
-    location: 'Urban Culvert Line C-8 (Industrial Sector)',
-    zone: 'Ward 14 (Industrial Area)',
-    x: 62,
-    y: 42,
-    waterLevel: '2.85 m',
-    threshold: '2.50 m',
-    flowRate: '0.4 m/s',
-    rainfall: '48 mm/hr',
-    status: 'CRITICAL',
-    blockagePct: 87,
-    reason: 'Heavy silt sedimentation and plastic waste trapped against trash rack, causing rapid backflow.',
-    action: 'Mobilize mechanical vacuum desilter crew immediately.',
-    battery: 92,
-    linkQuality: 'EXCELLENT',
-    commsStatus: 'ONLINE', // 'ONLINE' | 'LORA_FALLBACK' | 'OFFLINE'
-    rssiDbm: -72,
-    lastSeen: 'Just now',
-    operationalStatus: 'BLOCKED',
-    assignedWorker: 'Rapid Desilting Crew 1 (Ramesh K.)',
-    assignedWorkerId: 'CREW-01',
-    muted: false,
-    lastReading: 'Just now',
-    primarySensor: {
-      name: 'Acoustic AI Blockage & Depth',
-      type: 'Acoustic Ultrasonic',
-      status: 'ACTIVE',
-      reading: '2.85 m (87% Blockage)'
-    },
-    backupSensor: {
-      name: 'Submerged Hydrostatic Pressure',
-      type: 'Hydrostatic Pressure',
-      status: 'STANDBY',
-      reading: '2.84 m'
-    },
-    sensorHealth: 'PRIMARY_ACTIVE' // 'PRIMARY_ACTIVE' | 'BACKUP_ACTIVE' | 'ALL_FAILED'
-  },
-  {
-    id: 'NODE-WZ-04',
-    name: 'River Basin North Weir Gate',
-    location: 'River Basin North Weir Gate',
-    zone: 'Ward 4 (Riverside)',
+    id: 'D-01',
+    altId: 'NODE-WZ-04',
+    name: 'Riverside Culvert D-01',
+    location: 'Riverside Basin Weir Channel D-01',
+    zone: 'Zone A Riverside',
+    ward: 'Ward 4 (Riverside)',
     x: 28,
     y: 35,
-    waterLevel: '3.42 m',
-    threshold: '4.00 m',
+    waterLevel: '2.10 m',
+    threshold: '3.50 m',
     flowRate: '1.8 m/s',
-    rainfall: '42 mm/hr',
-    status: 'WARNING',
-    blockagePct: 15,
-    reason: 'Water stage approaching crest warning threshold due to upstream runoff. Siphon gates operating normally.',
-    action: 'Monitor crest progression; prepare secondary sluice gate opening.',
-    battery: 88,
-    linkQuality: 'GOOD',
-    commsStatus: 'ONLINE',
-    rssiDbm: -81,
-    lastSeen: '1m ago',
-    operationalStatus: 'NORMAL',
-    assignedWorker: null,
-    assignedWorkerId: null,
-    muted: false,
-    lastReading: '1 min ago',
-    primarySensor: {
-      name: 'Ultrasonic Stage Sensor',
-      type: 'Ultrasonic Depth',
-      status: 'ACTIVE',
-      reading: '3.42 m'
-    },
-    backupSensor: {
-      name: 'Pressure Transducer Gate Array',
-      type: 'Pressure Transducer',
-      status: 'STANDBY',
-      reading: '3.41 m'
-    },
-    sensorHealth: 'PRIMARY_ACTIVE'
-  },
-  {
-    id: 'NODE-P-03',
-    name: 'Central Underpass Sump',
-    location: 'Central Underpass Pumping Sump',
-    zone: 'Ward 11 (Market Road Catchment)',
-    x: 78,
-    y: 65,
-    waterLevel: '1.94 m',
-    threshold: '2.20 m',
-    flowRate: '1.2 m/s',
-    rainfall: '38 mm/hr',
-    status: 'WARNING',
-    blockagePct: 42,
-    reason: 'High inflow volume causing sump water accumulation. Dual submersible pumps active.',
-    action: 'Deploy emergency barrier if sump exceeds 2.2m.',
-    battery: 95,
-    linkQuality: 'EXCELLENT',
-    commsStatus: 'ONLINE',
-    rssiDbm: -68,
-    lastSeen: '2m ago',
-    operationalStatus: 'BLOCKED',
-    assignedWorker: null,
-    assignedWorkerId: null,
-    muted: false,
-    lastReading: '2 mins ago',
-    primarySensor: {
-      name: 'IoT Optical Flow & Level',
-      type: 'Optical Telemetry',
-      status: 'ACTIVE',
-      reading: '1.94 m'
-    },
-    backupSensor: {
-      name: 'Conductive Stage Switch Array',
-      type: 'Conductive Switch',
-      status: 'STANDBY',
-      reading: 'Stage 2 Active'
-    },
-    sensorHealth: 'PRIMARY_ACTIVE'
-  },
-  {
-    id: 'NODE-SB-12',
-    name: 'Siphon Retention Basin East',
-    location: 'Siphon Retention Basin East',
-    zone: 'Ward 9 (Weir Colony)',
-    x: 45,
-    y: 72,
-    waterLevel: '1.20 m',
-    threshold: '3.00 m',
-    flowRate: '2.4 m/s',
-    rainfall: '28 mm/hr',
+    rainfall: '32 mm/hr',
     status: 'NORMAL',
-    blockagePct: 4,
-    reason: 'Clear stormwater channel. Water discharging into retention wetland at nominal rate.',
-    action: 'Routine automated telemetry polling active.',
-    battery: 97,
+    blockagePct: 18,
+    blockageIndex: 0.18,
+    reason: 'Clear arterial stormwater culvert. Siphon gates discharging normally into river basin.',
+    action: 'Routine continuous telemetry monitoring.',
+    battery: 94,
     linkQuality: 'EXCELLENT',
     commsStatus: 'ONLINE',
-    rssiDbm: -70,
+    rssiDbm: -72,
     lastSeen: 'Just now',
     operationalStatus: 'NORMAL',
     assignedWorker: null,
@@ -150,83 +36,131 @@ const INITIAL_DRAIN_NODES = [
     muted: false,
     lastReading: 'Just now',
     primarySensor: {
-      name: 'Pressure Transducer Sensor',
-      type: 'Submerged Transducer',
+      name: 'Acoustic Ultrasonic Stage Sensor',
+      type: 'Ultrasonic Stage',
       status: 'ACTIVE',
-      reading: '1.20 m'
+      reading: '2.10 m (18% Blockage)'
     },
     backupSensor: {
-      name: 'Ultrasonic Stage Radar',
-      type: 'Radar Stage',
-      status: 'STANDBY',
-      reading: '1.20 m'
-    },
-    sensorHealth: 'PRIMARY_ACTIVE'
-  },
-  {
-    id: 'NODE-D-03',
-    name: 'Market Road Arterial Drain',
-    location: 'Market Road Arterial Storm Drain (Catchment D-03)',
-    zone: 'Ward 9 (Commercial Sector)',
-    x: 20,
-    y: 25,
-    waterLevel: '2.10 m',
-    threshold: '2.00 m',
-    flowRate: '0.8 m/s',
-    rainfall: '45 mm/hr',
-    status: 'CRITICAL',
-    blockagePct: 66,
-    reason: 'Market stall organic waste and leaf litter accumulation restricting arterial culvert mouth.',
-    action: 'Schedule emergency mechanical dredging.',
-    battery: 84,
-    linkQuality: 'GOOD',
-    commsStatus: 'ONLINE',
-    rssiDbm: -84,
-    lastSeen: '3m ago',
-    operationalStatus: 'BLOCKED',
-    assignedWorker: null,
-    assignedWorkerId: null,
-    muted: false,
-    lastReading: '3 mins ago',
-    primarySensor: {
-      name: 'Acoustic Doppler Flow Profiler',
-      type: 'Acoustic Doppler',
-      status: 'ACTIVE',
-      reading: '2.10 m (66% Blockage)'
-    },
-    backupSensor: {
-      name: 'Hydrostatic Level Gauge',
-      type: 'Hydrostatic',
+      name: 'Hydrostatic Pressure Transducer',
+      type: 'Hydrostatic Pressure',
       status: 'STANDBY',
       reading: '2.09 m'
     },
     sensorHealth: 'PRIMARY_ACTIVE'
   },
   {
-    id: 'NODE-D-07',
-    name: 'Metro Viaduct Storm Trench',
-    location: 'Metro Rail Viaduct Storm Trench (Zone 11)',
-    zone: 'Ward 4 (Metro Corridor)',
-    x: 85,
-    y: 30,
-    waterLevel: '2.40 m',
-    threshold: '2.10 m',
-    flowRate: '0.6 m/s',
-    rainfall: '40 mm/hr',
+    id: 'D-02',
+    altId: 'NODE-D-03',
+    name: 'Market Road Arterial D-02',
+    location: 'Market Road Arterial Storm Drain D-02',
+    zone: 'Zone B Market Road',
+    ward: 'Ward 9 (Commercial Sector)',
+    x: 42,
+    y: 55,
+    waterLevel: '2.85 m',
+    threshold: '2.50 m',
+    flowRate: '0.5 m/s',
+    rainfall: '45 mm/hr',
     status: 'CRITICAL',
-    blockagePct: 74,
-    reason: 'Construction debris and silt backflow trapped in deep viaduct trench segment.',
-    action: 'Dispatch desilting equipment before evening downpour.',
-    battery: 79,
-    linkQuality: 'EXCELLENT',
+    blockagePct: 82,
+    blockageIndex: 0.82,
+    reason: 'Heavy organic market refuse and silt sedimentation trapped against trash rack.',
+    action: 'Emergency municipal desilting crew required immediately.',
+    battery: 86,
+    linkQuality: 'GOOD',
     commsStatus: 'ONLINE',
-    rssiDbm: -76,
-    lastSeen: '4m ago',
+    rssiDbm: -82,
+    lastSeen: '1m ago',
     operationalStatus: 'BLOCKED',
     assignedWorker: null,
     assignedWorkerId: null,
     muted: false,
-    lastReading: '4 mins ago',
+    lastReading: '1 min ago',
+    primarySensor: {
+      name: 'Acoustic Doppler Flow Profiler',
+      type: 'Acoustic Doppler',
+      status: 'ACTIVE',
+      reading: '2.85 m (82% Blockage)'
+    },
+    backupSensor: {
+      name: 'Conductive Stage Switch Array',
+      type: 'Conductive Switch',
+      status: 'STANDBY',
+      reading: '2.84 m'
+    },
+    sensorHealth: 'PRIMARY_ACTIVE'
+  },
+  {
+    id: 'D-03',
+    altId: 'NODE-P-03',
+    name: 'Temple Street Siphon D-03',
+    location: 'Temple Street Siphon Drainage D-03',
+    zone: 'Zone C Temple Street',
+    ward: 'Ward 11 (Temple Precinct)',
+    x: 62,
+    y: 40,
+    waterLevel: '1.94 m',
+    threshold: '2.40 m',
+    flowRate: '1.1 m/s',
+    rainfall: '38 mm/hr',
+    status: 'WARNING',
+    blockagePct: 45,
+    blockageIndex: 0.45,
+    reason: 'Runoff accumulation in central sump; pumps operating at nominal rating.',
+    action: 'Deploy secondary trash rack screen before evening downpour.',
+    battery: 91,
+    linkQuality: 'EXCELLENT',
+    commsStatus: 'ONLINE',
+    rssiDbm: -70,
+    lastSeen: '2m ago',
+    operationalStatus: 'NORMAL',
+    assignedWorker: null,
+    assignedWorkerId: null,
+    muted: false,
+    lastReading: '2 mins ago',
+    primarySensor: {
+      name: 'Optical Telemetry & Level Radar',
+      type: 'Optical Telemetry',
+      status: 'ACTIVE',
+      reading: '1.94 m'
+    },
+    backupSensor: {
+      name: 'Submerged Hydrostatic Pressure',
+      type: 'Hydrostatic Pressure',
+      status: 'STANDBY',
+      reading: '1.94 m'
+    },
+    sensorHealth: 'PRIMARY_ACTIVE'
+  },
+  {
+    id: 'D-04',
+    altId: 'NODE-D-07',
+    name: 'Railway Colony Trench D-04',
+    location: 'Railway Colony Viaduct Trench D-04',
+    zone: 'Zone D Railway Colony',
+    ward: 'Ward 12 (Railway Colony)',
+    x: 75,
+    y: 65,
+    waterLevel: '2.40 m',
+    threshold: '2.20 m',
+    flowRate: '0.6 m/s',
+    rainfall: '40 mm/hr',
+    status: 'WARNING',
+    blockagePct: 74,
+    blockageIndex: 0.74,
+    reason: 'Construction gravel and silt backflow trapped in deep viaduct trench segment.',
+    action: 'Schedule mechanical vacuum jetting.',
+    battery: 79,
+    linkQuality: 'GOOD',
+    commsStatus: 'ONLINE',
+    rssiDbm: -78,
+    lastSeen: '3m ago',
+    operationalStatus: 'BLOCKED',
+    assignedWorker: null,
+    assignedWorkerId: null,
+    muted: false,
+    lastReading: '3 mins ago',
     primarySensor: {
       name: 'Ultrasonic Stage Sensor B',
       type: 'Ultrasonic Stage',
@@ -240,6 +174,90 @@ const INITIAL_DRAIN_NODES = [
       reading: '2.39 m'
     },
     sensorHealth: 'PRIMARY_ACTIVE'
+  },
+  {
+    id: 'D-05',
+    altId: 'NODE-C-08',
+    name: 'Lowland Retention Sump D-05',
+    location: 'Lowlands Sump Retention Basin D-05',
+    zone: 'Zone E Lowlands',
+    ward: 'Ward 14 (Lowland Industrial)',
+    x: 50,
+    y: 78,
+    waterLevel: '3.45 m',
+    threshold: '2.60 m',
+    flowRate: '0.4 m/s',
+    rainfall: '52 mm/hr',
+    status: 'CRITICAL',
+    blockagePct: 88,
+    blockageIndex: 0.88,
+    reason: 'Severe plastic debris obstruction causing upstream retention surge into road.',
+    action: 'Deploy emergency vacuum dredging and stage rescue units.',
+    battery: 92,
+    linkQuality: 'EXCELLENT',
+    commsStatus: 'ONLINE',
+    rssiDbm: -68,
+    lastSeen: 'Just now',
+    operationalStatus: 'BLOCKED',
+    assignedWorker: null,
+    assignedWorkerId: null,
+    muted: false,
+    lastReading: 'Just now',
+    primarySensor: {
+      name: 'Acoustic AI Blockage & Depth',
+      type: 'Acoustic Ultrasonic',
+      status: 'ACTIVE',
+      reading: '3.45 m (88% Blockage)'
+    },
+    backupSensor: {
+      name: 'Submerged Hydrostatic Pressure',
+      type: 'Hydrostatic Pressure',
+      status: 'STANDBY',
+      reading: '3.44 m'
+    },
+    sensorHealth: 'PRIMARY_ACTIVE'
+  },
+  {
+    id: 'D-06',
+    altId: 'NODE-SB-12',
+    name: 'Hospital Viaduct Sump D-06',
+    location: 'Hospital Road Underpass Sump D-06',
+    zone: 'Zone F Hospital Road',
+    ward: 'Ward 7 (Hospital Corridor)',
+    x: 82,
+    y: 25,
+    waterLevel: '1.25 m',
+    threshold: '2.80 m',
+    flowRate: '2.1 m/s',
+    rainfall: '26 mm/hr',
+    status: 'NORMAL',
+    blockagePct: 12,
+    blockageIndex: 0.12,
+    reason: 'Nominal stormwater drainage under hospital viaduct. Pumps standby.',
+    action: 'Routine telemetry poll active.',
+    battery: 96,
+    linkQuality: 'EXCELLENT',
+    commsStatus: 'ONLINE',
+    rssiDbm: -74,
+    lastSeen: 'Just now',
+    operationalStatus: 'NORMAL',
+    assignedWorker: null,
+    assignedWorkerId: null,
+    muted: false,
+    lastReading: 'Just now',
+    primarySensor: {
+      name: 'Pressure Transducer Sensor',
+      type: 'Submerged Transducer',
+      status: 'ACTIVE',
+      reading: '1.25 m'
+    },
+    backupSensor: {
+      name: 'Ultrasonic Stage Radar',
+      type: 'Radar Stage',
+      status: 'STANDBY',
+      reading: '1.25 m'
+    },
+    sensorHealth: 'PRIMARY_ACTIVE'
   }
 ];
 
@@ -247,100 +265,86 @@ const INITIAL_FLOOD_ALERTS = [
   {
     id: 'ALT-FL-01',
     title: 'Flash Inundation Warning — Lowland River Overflow',
-    zone: 'River Basin Weir Gate (Ward 4)',
+    zone: 'Zone E Lowlands',
     severity: 'CRITICAL',
-    waterLevel: '3.42 m (88%)',
-    rainfall: '48 mm/hr',
-    status: 'ON SCENE', // 'NEW' | 'ASSIGNED' | 'ON SCENE' | 'RESOLVED'
-    assignedTeamId: 'TEAM-01',
-    assignedTeamName: 'Rescue Unit Alpha',
-    assignedAt: '12m ago',
+    waterLevel: '3.45 m (88%)',
+    rainfall: '52 mm/hr',
+    status: 'NEW',
+    assignedTeamId: null,
+    assignedTeamName: null,
+    assignedAt: null,
     openedCampId: 'CAMP-01',
-    citizenNotified: true,
-    timestamp: '12m ago',
-    riskReason: 'Sustained precipitation upstream causing weir overflow into residential pocket.',
-    drainNodeId: 'NODE-WZ-04'
+    citizenNotified: false,
+    timestamp: '8m ago',
+    riskReason: 'Sustained precipitation upstream causing lowlands retention surge near residential sector.',
+    drainNodeId: 'D-05'
   },
   {
     id: 'ALT-FL-02',
-    title: 'Severe Urban Backflow & Stormwater Obstruction',
-    zone: 'Urban Culvert Line C-8 (Ward 14)',
-    severity: 'CRITICAL',
-    waterLevel: '2.85 m (87%)',
-    rainfall: '48 mm/hr',
-    status: 'ASSIGNED',
-    assignedTeamId: 'TEAM-02',
-    assignedTeamName: 'Rescue Unit Bravo',
-    assignedAt: '25m ago',
-    openedCampId: null,
-    citizenNotified: false,
-    timestamp: '25m ago',
-    riskReason: 'Culvert trash rack obstructed with 87% silt and debris; street water rising.',
-    drainNodeId: 'NODE-C-08'
-  },
-  {
-    id: 'ALT-FL-03',
-    title: 'Precautionary Inundation Advisory',
-    zone: 'Central Underpass Pumping Sump (Ward 11)',
+    title: 'Severe Arterial Silt Obstruction & Street Inflow',
+    zone: 'Zone B Market Road',
     severity: 'WARNING',
-    waterLevel: '1.94 m (52%)',
-    rainfall: '38 mm/hr',
+    waterLevel: '2.85 m (82%)',
+    rainfall: '45 mm/hr',
     status: 'NEW',
     assignedTeamId: null,
     assignedTeamName: null,
     assignedAt: null,
     openedCampId: null,
     citizenNotified: false,
-    timestamp: '1h ago',
-    riskReason: 'Dual submersible pump operating near peak capacity; runoff approaching barrier.',
-    drainNodeId: 'NODE-P-03'
+    timestamp: '18m ago',
+    riskReason: 'Market stall organic waste and leaf litter restricting arterial culvert mouth.',
+    drainNodeId: 'D-02'
   }
 ];
 
 const INITIAL_RESCUE_TEAMS = [
   {
     id: 'TEAM-01',
-    name: 'Rescue Unit Alpha',
+    name: 'Alpha Flood Rescue',
+    leader: 'Ravi Kumar',
     role: 'Disaster Rescue & Water Extraction',
     type: 'RESCUE',
-    zone: 'Ward 4 (Riverside)',
-    status: 'ON SCENE', // 'AVAILABLE' | 'DISPATCHED' | 'ON SCENE' | 'STANDBY'
+    zone: 'Zone A Riverside',
+    status: 'AVAILABLE',
     personnel: 6,
     boats: 2,
     ambulances: 0,
-    etaMinutes: 0,
-    target: 'River Basin Weir Gate (Ward 4)',
-    assignedTargetId: 'ALT-FL-01',
-    assignedAt: '12m ago',
-    workload: 1
+    etaMinutes: 4,
+    target: null,
+    assignedTargetId: null,
+    assignedAt: null,
+    workload: 0
   },
   {
     id: 'TEAM-02',
-    name: 'Rescue Unit Bravo',
-    role: 'Urban Stormwater Evacuation',
+    name: 'Bravo Boat Unit',
+    leader: 'Lakshmi Devi',
+    role: 'Water Rescue & Inundation Transport',
     type: 'RESCUE',
-    zone: 'Ward 14 (Industrial Area)',
-    status: 'DISPATCHED',
-    personnel: 4,
-    boats: 1,
+    zone: 'Zone E Lowlands',
+    status: 'AVAILABLE',
+    personnel: 5,
+    boats: 2,
     ambulances: 0,
-    etaMinutes: 12,
-    target: 'Urban Culvert Line C-8 (Ward 14)',
-    assignedTargetId: 'ALT-FL-02',
-    assignedAt: '25m ago',
-    workload: 1
+    etaMinutes: 6,
+    target: null,
+    assignedTargetId: null,
+    assignedAt: null,
+    workload: 0
   },
   {
     id: 'TEAM-03',
-    name: 'Medical Response Cell',
-    role: 'Emergency Triage & Paramedic',
+    name: 'Charlie Medical Response',
+    leader: 'Dr. Anil Reddy',
+    role: 'Emergency Medical & Triage',
     type: 'MEDICAL',
-    zone: 'Central Hospital Hub',
+    zone: 'Zone F Hospital Road',
     status: 'AVAILABLE',
-    personnel: 5,
+    personnel: 4,
     boats: 0,
     ambulances: 2,
-    etaMinutes: null,
+    etaMinutes: 8,
     target: null,
     assignedTargetId: null,
     assignedAt: null,
@@ -348,49 +352,70 @@ const INITIAL_RESCUE_TEAMS = [
   },
   {
     id: 'TEAM-04',
-    name: 'Rapid Evacuation Squad',
-    role: 'High-Clearance Flood Transport',
-    type: 'RESCUE',
-    zone: 'Sector 4 Underpass',
+    name: 'Delta Evacuation Unit',
+    leader: 'Suresh Naidu',
+    role: 'High-Clearance Flood Evacuation',
+    type: 'EVACUATION',
+    zone: 'Zone D Railway Colony',
     status: 'AVAILABLE',
     personnel: 8,
     boats: 3,
     ambulances: 1,
-    etaMinutes: null,
+    etaMinutes: 10,
     target: null,
     assignedTargetId: null,
     assignedAt: null,
     workload: 0
   },
   {
+    id: 'TEAM-05',
+    name: 'Echo Relief Logistics',
+    leader: 'Priya Sharma',
+    role: 'Emergency Food, Water & Camp Supply',
+    type: 'LOGISTICS',
+    zone: 'Zone C Temple Street',
+    status: 'AVAILABLE',
+    personnel: 4,
+    boats: 1,
+    ambulances: 0,
+    etaMinutes: 12,
+    target: null,
+    assignedTargetId: null,
+    assignedAt: null,
+    workload: 0
+  },
+  // 6 Municipal Cleaning Crew Workers
+  {
     id: 'CREW-01',
-    name: 'Rapid Desilting Crew 1',
-    role: 'High-Velocity Sucker & Culvert Jetting',
+    name: 'Drainage Crew 1 (Venkatesh R.)',
+    leader: 'Venkatesh R.',
+    leadWorker: 'Venkatesh R.',
+    role: 'Culvert Jetting & Silt Dredging',
     type: 'CLEANING',
-    zone: 'Ward 14 (Industrial Area)',
-    leadWorker: 'Ramesh K. (Senior Desilting Tech)',
-    status: 'DISPATCHED',
+    zone: 'Zone A Riverside',
+    status: 'AVAILABLE',
     personnel: 4,
     boats: 0,
     ambulances: 0,
-    etaMinutes: 15,
-    target: 'Culvert Line C-8',
-    assignedTargetId: 'NODE-C-08',
-    assignedAt: '18m ago',
-    workload: 1
+    etaMinutes: 5,
+    target: null,
+    assignedTargetId: null,
+    assignedAt: null,
+    workload: 0
   },
   {
     id: 'CREW-02',
-    name: 'Hydraulic Vacuum Unit 2',
-    role: 'Heavy Mechanical Dredging & Silt Clearing',
+    name: 'Drainage Crew 2 (Srinivas K.)',
+    leader: 'Srinivas K.',
+    leadWorker: 'Srinivas K.',
+    role: 'Trash Rack Clearing & Dredging',
     type: 'CLEANING',
-    zone: 'Ward 9 (Commercial Sector)',
-    leadWorker: 'S. Suresh (Sanitation Supervisor)',
+    zone: 'Zone B Market Road',
     status: 'AVAILABLE',
     personnel: 3,
     boats: 0,
     ambulances: 0,
-    etaMinutes: null,
+    etaMinutes: 4,
     target: null,
     assignedTargetId: null,
     assignedAt: null,
@@ -398,16 +423,71 @@ const INITIAL_RESCUE_TEAMS = [
   },
   {
     id: 'CREW-03',
-    name: 'Emergency Trench Squad 3',
-    role: 'Trash Rack Clearing & Manual De-weeding',
+    name: 'Drainage Crew 3 (Mahesh B.)',
+    leader: 'Mahesh B.',
+    leadWorker: 'Mahesh B.',
+    role: 'Sediment Extraction & Pump Clearing',
     type: 'CLEANING',
-    zone: 'Ward 4 (Metro Corridor)',
-    leadWorker: 'M. Anjaneyulu (Civic Drainage Eng)',
+    zone: 'Zone C Temple Street',
     status: 'AVAILABLE',
     personnel: 4,
     boats: 0,
     ambulances: 0,
-    etaMinutes: null,
+    etaMinutes: 6,
+    target: null,
+    assignedTargetId: null,
+    assignedAt: null,
+    workload: 0
+  },
+  {
+    id: 'CREW-04',
+    name: 'Drainage Crew 4 (Anitha P.)',
+    leader: 'Anitha P.',
+    leadWorker: 'Anitha P.',
+    role: 'High-Velocity Sucker Jetting',
+    type: 'CLEANING',
+    zone: 'Zone D Railway Colony',
+    status: 'AVAILABLE',
+    personnel: 3,
+    boats: 0,
+    ambulances: 0,
+    etaMinutes: 7,
+    target: null,
+    assignedTargetId: null,
+    assignedAt: null,
+    workload: 0
+  },
+  {
+    id: 'CREW-05',
+    name: 'Drainage Crew 5 (Ramesh T.)',
+    leader: 'Ramesh T.',
+    leadWorker: 'Ramesh T.',
+    role: 'Emergency Culvert Desilting',
+    type: 'CLEANING',
+    zone: 'Zone E Lowlands',
+    status: 'AVAILABLE',
+    personnel: 5,
+    boats: 0,
+    ambulances: 0,
+    etaMinutes: 4,
+    target: null,
+    assignedTargetId: null,
+    assignedAt: null,
+    workload: 0
+  },
+  {
+    id: 'CREW-06',
+    name: 'Drainage Crew 6 (Kiran M.)',
+    leader: 'Kiran M.',
+    leadWorker: 'Kiran M.',
+    role: 'Viaduct Sump & Trench Cleaning',
+    type: 'CLEANING',
+    zone: 'Zone F Hospital Road',
+    status: 'AVAILABLE',
+    personnel: 4,
+    boats: 0,
+    ambulances: 0,
+    etaMinutes: 8,
     target: null,
     assignedTargetId: null,
     assignedAt: null,
@@ -832,6 +912,280 @@ export function FloodGuardProvider({ children }) {
         ...prev,
         drainNodes: updatedDrains,
         floodAlerts: [newAlert, ...prev.floodAlerts.filter(a => a.id !== multiAlertId)],
+        activityLog: [newActivity, ...prev.activityLog].slice(0, 60)
+      };
+    });
+  }, [showToast]);
+
+  // Scenario 1: Heavy Rain Surge
+  const triggerHeavyRainSurgeScenario = useCallback(() => {
+    setStore(prev => {
+      const updatedDrains = prev.drainNodes.map(d => {
+        if (d.id === 'D-02' || d.altId === 'NODE-D-03') {
+          return { ...d, rainfall: '68 mm/hr', blockagePct: 88, blockageIndex: 0.88, waterLevel: '2.95 m', status: 'CRITICAL', operationalStatus: 'BLOCKED' };
+        }
+        if (d.id === 'D-04' || d.altId === 'NODE-D-07') {
+          return { ...d, rainfall: '68 mm/hr', blockagePct: 85, blockageIndex: 0.85, waterLevel: '2.62 m', status: 'CRITICAL', operationalStatus: 'BLOCKED' };
+        }
+        if (d.id === 'D-05' || d.altId === 'NODE-C-08') {
+          return { ...d, rainfall: '68 mm/hr', blockagePct: 92, blockageIndex: 0.92, waterLevel: '3.65 m', status: 'CRITICAL', operationalStatus: 'BLOCKED' };
+        }
+        return { ...d, rainfall: '68 mm/hr' };
+      });
+
+      const newAlert = {
+        id: `ALT-SURGE-${Date.now().toString().slice(-4)}`,
+        title: 'Flash Inundation Warning — Heavy Rain Surge in Zone E Lowlands',
+        zone: 'Zone E Lowlands',
+        severity: 'CRITICAL',
+        waterLevel: '3.65 m (92%)',
+        threshold: '2.60 m',
+        rainfall: '68 mm/hr',
+        time: 'Just now',
+        timestamp: Date.now(),
+        status: 'NEW',
+        assignedTeamId: null,
+        assignedTeamName: null,
+        drainNodeId: 'D-05',
+        riskReason: 'Upstream precipitation deluge (68 mm/hr) exceeding retention sump overflow threshold.'
+      };
+
+      const newActivity = {
+        id: `ACT-${Math.floor(1000 + Math.random() * 9000)}`,
+        timestamp: new Date().toLocaleTimeString(),
+        actor: 'Simulation Engine',
+        action: 'SCENARIO_HEAVY_RAIN',
+        details: 'Heavy Rain Surge Scenario: Rainfall spiked to 68 mm/hr; D-02 (88%), D-04 (85%), D-05 (92%) severely obstructed; Zone E Flash Flood alert initiated.',
+        tag: '[SIMULATED]',
+        isAgent: false
+      };
+
+      showToast('Heavy Rain Surge scenario activated: 3 drains obstructed, Zone E flood alert active!');
+
+      return {
+        ...prev,
+        drainNodes: updatedDrains,
+        floodAlerts: [newAlert, ...prev.floodAlerts.filter(a => a.id !== newAlert.id)],
+        activityLog: [newActivity, ...prev.activityLog].slice(0, 60)
+      };
+    });
+  }, [showToast]);
+
+  // Scenario 2: Sensor Failure
+  const triggerSensorFailureScenario = useCallback(() => {
+    setStore(prev => {
+      const updatedDrains = prev.drainNodes.map(d => {
+        if (d.id === 'D-03' || d.altId === 'NODE-P-03') {
+          return {
+            ...d,
+            primarySensor: {
+              ...d.primarySensor,
+              status: 'FAILED',
+              reading: '0.00 m (NO SIGNAL)'
+            },
+            backupSensor: {
+              ...d.backupSensor,
+              status: 'ACTIVE',
+              reading: '1.98 m'
+            },
+            sensorHealth: 'BACKUP_ACTIVE'
+          };
+        }
+        return d;
+      });
+
+      const newActivity = {
+        id: `ACT-${Math.floor(1000 + Math.random() * 9000)}`,
+        timestamp: new Date().toLocaleTimeString(),
+        actor: 'Sentinel (Sensor Agent)',
+        action: 'SENSOR_FAILOVER',
+        details: 'Sensor Failure Scenario: Primary acoustic sensor at D-03 (Zone C Temple Street) failed. Sentinel autonomously activated redundant hydrostatic backup sensor.',
+        tag: '[SIMULATED]',
+        isAgent: true
+      };
+
+      showToast('Sensor Failure scenario: D-03 primary failed, backup sensor activated by Sentinel!');
+
+      return {
+        ...prev,
+        drainNodes: updatedDrains,
+        activityLog: [newActivity, ...prev.activityLog].slice(0, 60)
+      };
+    });
+  }, [showToast]);
+
+  // Scenario 3: Network Outage
+  const triggerNetworkOutageScenario = useCallback(() => {
+    setStore(prev => {
+      const updatedDrains = prev.drainNodes.map(d => {
+        if (d.id === 'D-04' || d.altId === 'NODE-D-07') {
+          return {
+            ...d,
+            commsStatus: 'LORA_FALLBACK'
+          };
+        }
+        return d;
+      });
+
+      const loraMsg = {
+        id: `LORA-SIM-${Date.now().toString().slice(-4)}`,
+        zone: 'Zone D Railway Colony',
+        message: 'EMERGENCY: Cellular tower offline in Railway Colony. SensaFlow LoRa mesh routing active. Flood warning in effect.',
+        queuedAt: new Date().toLocaleTimeString(),
+        status: 'QUEUED',
+        bytes: 68
+      };
+
+      const newActivity = {
+        id: `ACT-${Math.floor(1000 + Math.random() * 9000)}`,
+        timestamp: new Date().toLocaleTimeString(),
+        actor: 'Herald (Communication Agent)',
+        action: 'NETWORK_OUTAGE_LORA',
+        details: 'Network Outage Scenario: Cellular tower offline in Zone D Railway Colony. Herald switched comms to 868MHz LoRa mesh packets.',
+        tag: '[SIMULATED]',
+        isAgent: true
+      };
+
+      showToast('Network Outage scenario: Zone D dropped to LoRa fallback, alert queued!');
+
+      return {
+        ...prev,
+        isOutageActive: true,
+        drainNodes: updatedDrains,
+        loraQueue: [loraMsg, ...prev.loraQueue],
+        activityLog: [newActivity, ...prev.activityLog].slice(0, 60)
+      };
+    });
+  }, [showToast]);
+
+  // Scenario 4: Multi-Incident Storm
+  const triggerMultiIncidentStormScenario = useCallback(() => {
+    setStore(prev => {
+      const updatedDrains = prev.drainNodes.map(d => {
+        if (d.id === 'D-02' || d.altId === 'NODE-D-03') {
+          return {
+            ...d,
+            blockagePct: 89,
+            blockageIndex: 0.89,
+            waterLevel: '2.94 m',
+            status: 'CRITICAL',
+            operationalStatus: 'BLOCKED',
+            reason: 'Severe organic market refuse choking arterial trash rack.'
+          };
+        }
+        if (d.id === 'D-04' || d.altId === 'NODE-D-07') {
+          return {
+            ...d,
+            primarySensor: { ...d.primarySensor, status: 'FAILED', reading: '0.00 m (NO SIGNAL)' },
+            sensorHealth: 'PRIMARY_FAILED'
+          };
+        }
+        return d;
+      });
+
+      const multiAlert = {
+        id: `ALT-STORM-${Date.now().toString().slice(-4)}`,
+        title: 'Flash Inundation Warning — Multi-Incident Storm in Zone E Lowlands',
+        zone: 'Zone E Lowlands',
+        severity: 'CRITICAL',
+        waterLevel: '3.70 m (94%)',
+        threshold: '2.60 m',
+        rainfall: '65 mm/hr',
+        time: 'Just now',
+        timestamp: Date.now(),
+        status: 'NEW',
+        assignedTeamId: null,
+        assignedTeamName: null,
+        drainNodeId: 'D-05',
+        riskReason: 'Extreme urban storm surge in Zone E Lowlands with simultaneous arterial blockage and sensor failure.'
+      };
+
+      const newActivity = {
+        id: `ACT-${Math.floor(1000 + Math.random() * 9000)}`,
+        timestamp: new Date().toLocaleTimeString(),
+        actor: 'Simulation Engine',
+        action: 'MULTI_INCIDENT_STORM',
+        details: 'Multi-Incident Storm Scenario: Blockage in Zone B (89%), primary sensor failure in Zone D, and Critical flash flood in Zone E Lowlands triggered simultaneously.',
+        tag: '[SIMULATED]',
+        isAgent: false
+      };
+
+      showToast('Multi-Incident Storm scenario active: Multi-tasking across all agent lanes!');
+
+      return {
+        ...prev,
+        drainNodes: updatedDrains,
+        floodAlerts: [multiAlert, ...prev.floodAlerts.filter(a => a.id !== multiAlert.id)],
+        activityLog: [newActivity, ...prev.activityLog].slice(0, 60)
+      };
+    });
+  }, [showToast]);
+
+  // Undo Agent Action within 10-Second Window
+  const undoAgentAction = useCallback((actionToUndo) => {
+    setStore(prev => {
+      let updatedTeams = [...prev.rescueTeams];
+      let updatedDrains = [...prev.drainNodes];
+      let updatedAlerts = [...prev.floodAlerts];
+
+      if (actionToUndo?.teamId) {
+        updatedTeams = updatedTeams.map(t => t.id === actionToUndo.teamId ? {
+          ...t,
+          status: 'AVAILABLE',
+          target: null,
+          assignedTargetId: null,
+          assignedAt: null,
+          workload: 0
+        } : t);
+      }
+
+      if (actionToUndo?.workerId) {
+        updatedTeams = updatedTeams.map(t => t.id === actionToUndo.workerId ? {
+          ...t,
+          status: 'AVAILABLE',
+          target: null,
+          assignedTargetId: null,
+          assignedAt: null,
+          workload: 0
+        } : t);
+      }
+
+      if (actionToUndo?.alertId) {
+        updatedAlerts = updatedAlerts.map(a => a.id === actionToUndo.alertId ? {
+          ...a,
+          status: 'NEW',
+          assignedTeamId: null,
+          assignedTeamName: null,
+          assignedAt: null
+        } : a);
+      }
+
+      if (actionToUndo?.drainId) {
+        updatedDrains = updatedDrains.map(d => (d.id === actionToUndo.drainId || d.altId === actionToUndo.drainId) ? {
+          ...d,
+          operationalStatus: 'BLOCKED',
+          assignedWorker: null,
+          assignedWorkerId: null
+        } : d);
+      }
+
+      const newActivity = {
+        id: `ACT-${Math.floor(1000 + Math.random() * 9000)}`,
+        timestamp: new Date().toLocaleTimeString(),
+        actor: 'Operator (Undo)',
+        action: 'ACTION_UNDONE',
+        details: actionToUndo?.description ? `Undid: ${actionToUndo.description}` : 'Reverted last agent action within 10-second window.',
+        tag: '[OVERRIDE]',
+        isAgent: false
+      };
+
+      showToast(`Undid action: ${actionToUndo?.teamName || 'Resource'} freed.`);
+
+      return {
+        ...prev,
+        rescueTeams: updatedTeams,
+        drainNodes: updatedDrains,
+        floodAlerts: updatedAlerts,
         activityLog: [newActivity, ...prev.activityLog].slice(0, 60)
       };
     });
@@ -1952,7 +2306,14 @@ export function FloodGuardProvider({ children }) {
     triggerSendAlertForArea: (areaName, defaultLevel = 'DANGER') => {
       setAlertPrefillParams({ area: areaName, level: defaultLevel });
       setActiveTabIntent('alerts');
-    }
+    },
+
+    // Multi-Agent Coordinator Preset Scenarios & Undo
+    triggerHeavyRainSurgeScenario,
+    triggerSensorFailureScenario,
+    triggerNetworkOutageScenario,
+    triggerMultiIncidentStormScenario,
+    undoAgentAction
   };
 
   return (

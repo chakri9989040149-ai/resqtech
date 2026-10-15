@@ -37,7 +37,7 @@ import { LoRaSimulationService, PACKET_SPEC } from '../services/loraSim';
 import MaintenanceModule from '../components/MaintenanceModule';
 import { MaintenanceSimulationService } from '../services/maintenanceSim';
 import FloodAlertCenter from '../components/FloodAlertCenter';
-import CoordinatorAgentPanel from '../components/CoordinatorAgentPanel';
+import MultiAgentCoordinatorPanel from '../components/MultiAgentCoordinatorPanel';
 
 const SHIPMENT_PROOFS = [
   {
@@ -155,6 +155,7 @@ export default function DashboardPage() {
   const [selectedZoneTeam, setSelectedZoneTeam] = useState('');
   const [selectedZoneCamp, setSelectedZoneCamp] = useState('');
   const [newReassignZone, setNewReassignZone] = useState('');
+  const [traceModalEntry, setTraceModalEntry] = useState(null);
 
   // LoRa Comms Simulation State
   const [loraData, setLoraData] = useState(null);
@@ -495,8 +496,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* SensaFlow Coordinator Agent Panel (Autonomous Rule-Based Multi-Tasking Engine) */}
-          <CoordinatorAgentPanel />
+          {/* SensaFlow Multi-Agent Coordinator (Simulated Autonomous 5-Agent Cooperative Engine) */}
+          <MultiAgentCoordinatorPanel />
 
           {/* 5 Core Interactive KPI Cards */}
           <div style={{
@@ -917,22 +918,42 @@ export default function DashboardPage() {
                     <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{entry.timestamp}</span>
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-primary)' }}>{entry.details}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {(entry.isAgent || entry.actor === 'Coordinator Agent') && (
+                        <span style={{
+                          background: 'rgba(124, 58, 237, 0.12)',
+                          color: '#7C3AED',
+                          border: '1px solid rgba(124, 58, 237, 0.3)',
+                          borderRadius: '4px',
+                          padding: '1px 6px',
+                          fontSize: '9px',
+                          fontWeight: 700,
+                          letterSpacing: '0.04em'
+                        }}>
+                          🤖 AGENT
+                        </span>
+                      )}
+                      <span>{entry.actor} &bull; <span style={{ color: '#3B82F6' }}>{entry.tag}</span></span>
+                    </div>
+
                     {(entry.isAgent || entry.actor === 'Coordinator Agent') && (
-                      <span style={{
-                        background: 'rgba(124, 58, 237, 0.12)',
-                        color: '#7C3AED',
-                        border: '1px solid rgba(124, 58, 237, 0.3)',
-                        borderRadius: '4px',
-                        padding: '1px 6px',
-                        fontSize: '9px',
-                        fontWeight: 700,
-                        letterSpacing: '0.04em'
-                      }}>
-                        🤖 AGENT
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setTraceModalEntry(entry)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#2563EB',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          padding: '2px 4px'
+                        }}
+                      >
+                        Why did agent do this? &rarr;
+                      </button>
                     )}
-                    <span>{entry.actor} &bull; <span style={{ color: '#3B82F6' }}>{entry.tag}</span></span>
                   </div>
                 </div>
               ))}
@@ -3301,6 +3322,98 @@ export default function DashboardPage() {
           <span style={{ fontSize: '9px', fontWeight: 800, color: '#3B82F6', background: 'rgba(59, 130, 246, 0.15)', padding: '1px 5px', borderRadius: '3px', marginLeft: '6px' }}>
             [SIMULATED]
           </span>
+        </div>
+      )}
+
+      {/* Perceive-to-Report Trace Audit Dialog for Activity Journal */}
+      {traceModalEntry && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.65)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setTraceModalEntry(null)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-medium)',
+              borderRadius: '8px',
+              maxWidth: '600px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '20px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '10px', marginBottom: '14px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text-primary)' }}>
+                  Perceive-to-Report Trace Audit
+                </h3>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  Action: {traceModalEntry.action} &bull; {traceModalEntry.timestamp}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTraceModalEntry(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '18px' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12px' }}>
+              <div style={{ padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
+                <strong style={{ color: '#0D9488' }}>1. PERCEIVE:</strong> Sentinel detected telemetry anomaly from IoT drainage sensor baseline.
+              </div>
+              <div style={{ padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
+                <strong style={{ color: '#D97706' }}>2. REASON:</strong> Triage evaluated multi-criteria risk (severity, population density, rainfall rate). Priority score: <strong>92/100</strong>.
+              </div>
+              <div style={{ padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
+                <strong style={{ color: '#2563EB' }}>3. PLAN:</strong> Evaluated proximity, capability, and double-booking avoidance. Selected top-scoring candidate resource.
+              </div>
+              <div style={{ padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
+                <strong style={{ color: '#4F46E5' }}>4. ACT:</strong> {traceModalEntry.details}
+              </div>
+              <div style={{ padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
+                <strong style={{ color: '#059669' }}>5. VERIFY:</strong> Steward confirmed state transition and synchronized store counters across all 6 tabs.
+              </div>
+              <div style={{ padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
+                <strong style={{ color: '#7C3AED' }}>6. REPORT:</strong> Recorded immutable auditable entry to Activity Log marked with 🤖 AGENT badge.
+              </div>
+            </div>
+
+            <div style={{ marginTop: '16px', textAlign: 'right' }}>
+              <button
+                type="button"
+                onClick={() => setTraceModalEntry(null)}
+                style={{
+                  background: '#0F172A',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '6px 14px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Close Audit Trace
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
