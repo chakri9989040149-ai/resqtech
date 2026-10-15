@@ -30,7 +30,7 @@ export default function HeaderNavbar({ currentView, onNavigate }) {
         letterSpacing: '0.02em'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontWeight: 700 }}>FloodGuard AI</span>
+          <span style={{ fontWeight: 700 }}>SensaFlow</span>
           <span style={{ opacity: 0.6 }}>&bull;</span>
           <span style={{ opacity: 0.9 }}>Distributed Flood Warning &amp; Drainage Blockage Detection</span>
         </div>
@@ -84,11 +84,11 @@ export default function HeaderNavbar({ currentView, onNavigate }) {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-                FloodGuard <span style={{ color: 'var(--water-cyan-600)' }}>AI</span>
+                Sensa<span style={{ color: 'var(--water-cyan-600)' }}>Flow</span>
               </span>
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>
-              Detect Early. Alert Instantly. Rescue Faster.
+              Sense Early. Alert Instantly. Rescue Faster.
             </div>
           </div>
         </div>

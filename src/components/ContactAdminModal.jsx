@@ -127,7 +127,7 @@ export default function ContactAdminModal({ isOpen, onClose }) {
                 <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' }}>IT Operations</span>
               </div>
               <div style={{ fontSize: '13px', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-                helpdesk@floodguard.gov.in
+                helpdesk@sensaflow.gov.in
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                 PGP Encrypted email

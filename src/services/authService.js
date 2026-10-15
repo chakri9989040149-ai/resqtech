@@ -1,5 +1,5 @@
 /**
- * FloodGuard AI — Authentication Service & Government Identity Adapter
+ * SensaFlow — Authentication Service & Government Identity Adapter
  * 
  * Provides isolated authentication architecture.
  * Integrates with live backend when VITE_API_URL is configured,
@@ -9,14 +9,14 @@
 // =============================================================================
 // 1. ALLOWED DEMO DOMAINS & DEMO ACCOUNTS
 // =============================================================================
-export const ALLOWED_DEMO_DOMAINS = ['demo.floodguard.ai'];
+export const ALLOWED_DEMO_DOMAINS = ['demo.sensaflow.ai', 'demo.floodguard.ai'];
 
 export const DEMO_PASSWORD = 'Demo@GovGuard2026';
 
 export const DEMO_ACCOUNTS = [
   {
     employeeId: 'EMP-DEMO-01',
-    email: 'officer@demo.floodguard.ai',
+    email: 'officer@demo.sensaflow.ai',
     name: 'Demo Officer',
     department: 'State Disaster Management Authority',
     designation: 'Disaster Response Coordinator',
@@ -26,7 +26,7 @@ export const DEMO_ACCOUNTS = [
   },
   {
     employeeId: 'EMP-DEMO-02',
-    email: 'engineer@demo.floodguard.ai',
+    email: 'engineer@demo.sensaflow.ai',
     name: 'Demo Field Engineer',
     department: 'Public Works Department',
     designation: 'Drainage Field Engineer',
@@ -36,7 +36,7 @@ export const DEMO_ACCOUNTS = [
   },
   {
     employeeId: 'EMP-DEMO-03',
-    email: 'coordinator@demo.floodguard.ai',
+    email: 'coordinator@demo.sensaflow.ai',
     name: 'Demo District Officer',
     department: 'District Disaster Management Authority',
     designation: 'District Coordinator',
@@ -308,11 +308,12 @@ export async function authenticateEmployee({
     acc => acc.employeeId.toUpperCase() === cleanId
   );
   const matchedByEmail = DEMO_ACCOUNTS.find(
-    acc => acc.email.toLowerCase() === cleanEmail
+    acc => acc.email.toLowerCase() === cleanEmail 
+      || acc.email.toLowerCase().replace('@demo.sensaflow.ai', '@demo.floodguard.ai') === cleanEmail
   );
 
-  // If this was attempted as an EMP-DEMO account or a demo.floodguard.ai email
-  const isDemoAccountAttempt = cleanId.startsWith('EMP-DEMO') || cleanEmail.includes('demo.floodguard.ai');
+  // If this was attempted as an EMP-DEMO account or a demo.sensaflow.ai / demo.floodguard.ai email
+  const isDemoAccountAttempt = cleanId.startsWith('EMP-DEMO') || cleanEmail.includes('demo.sensaflow.ai') || cleanEmail.includes('demo.floodguard.ai');
 
   if (isDemoAccountAttempt) {
     if (!matchedById) {

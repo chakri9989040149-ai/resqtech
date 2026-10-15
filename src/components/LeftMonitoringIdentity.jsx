@@ -79,7 +79,7 @@ export default function LeftMonitoringIdentity() {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.02em' }}>
-                  FloodGuard <span style={{ color: '#38BDF8' }}>AI</span>
+                  Sensa<span style={{ color: '#38BDF8' }}>Flow</span>
                 </span>
                 <span style={{
                   fontSize: '10px',

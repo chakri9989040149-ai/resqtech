@@ -288,7 +288,7 @@ export default function FloodAlertCenter({ drainNodes = [], forecastRainfall = 4
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `floodguard_broadcast_logs_${Date.now()}.csv`);
+    link.setAttribute('download', `sensaflow_broadcast_logs_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

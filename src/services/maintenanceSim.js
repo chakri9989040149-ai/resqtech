@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * FLOODGUARD AI — MAINTENANCE & HYDRAULIC UPKEEP SIMULATION (maintenanceSim.js)
+ * SENSAFLOW — MAINTENANCE & HYDRAULIC UPKEEP SIMULATION (maintenanceSim.js)
  * ============================================================================
  * 
  * Simulates:
@@ -274,7 +274,8 @@ export const INITIAL_DRAINS = [
   }
 ];
 
-const STORAGE_KEY = 'floodguard_maintenance_jobs';
+const STORAGE_KEY = 'sensaflow_maintenance_jobs';
+const LEGACY_STORAGE_KEY = 'floodguard_maintenance_jobs';
 
 export class MaintenanceSimulationService {
   constructor(onUpdateCallback = null) {
@@ -290,7 +291,7 @@ export class MaintenanceSimulationService {
 
   loadScheduledJobs() {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (stored) {
         return JSON.parse(stored);
       }

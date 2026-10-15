@@ -6,7 +6,7 @@ export function ThemeProvider({ children }) {
   // First visit must strictly default to 'light', even if system prefers dark
   const [theme, setTheme] = useState(() => {
     try {
-      const saved = localStorage.getItem('floodguard_theme');
+      const saved = localStorage.getItem('sensaflow_theme') || localStorage.getItem('floodguard_theme');
       if (saved === 'dark' || saved === 'light') {
         return saved;
       }
@@ -19,7 +19,7 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     try {
-      localStorage.setItem('floodguard_theme', theme);
+      localStorage.setItem('sensaflow_theme', theme);
     } catch {
       // ignore
     }

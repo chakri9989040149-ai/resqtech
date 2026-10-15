@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * FLOODGUARD AI — LORA (LONG RANGE) COMMUNICATION SIMULATION SERVICE (loraSim.js)
+ * SENSAFLOW — LORA (LONG RANGE) COMMUNICATION SIMULATION SERVICE (loraSim.js)
  * ============================================================================
  * 
  * Simulates a municipal sub-GHz LoRa mesh/star network for edge IoT drain sensors:

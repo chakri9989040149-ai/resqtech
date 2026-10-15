@@ -106,11 +106,11 @@ export default function DashboardPage() {
 
   // Tab persistence via sessionStorage
   const [activeTab, setActiveTab] = useState(() => {
-    return sessionStorage.getItem('floodguard_active_tab') || 'overview';
+    return sessionStorage.getItem('sensaflow_active_tab') || sessionStorage.getItem('floodguard_active_tab') || 'overview';
   });
 
   useEffect(() => {
-    sessionStorage.setItem('floodguard_active_tab', activeTab);
+    sessionStorage.setItem('sensaflow_active_tab', activeTab);
   }, [activeTab]);
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -413,7 +413,7 @@ export default function DashboardPage() {
       {/* SECTION 2: SIX CLEAN TABS (Accessible tablist with arrow keys & persistence) */}
       <div
         role="tablist"
-        aria-label="FloodGuard Command Center Tabs"
+        aria-label="SensaFlow Command Center Tabs"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',

@@ -124,7 +124,7 @@ function MainApp() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ShieldCheck size={16} color="var(--gov-blue-700)" />
               <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-                FloodGuard AI &bull; National Disaster Management &amp; Drainage Early Warning Network
+                SensaFlow &bull; National Disaster Management &amp; Drainage Early Warning Network
               </span>
             </div>
 
@@ -164,7 +164,7 @@ function MainApp() {
             fontSize: '11px'
           }}>
             <div>
-              FloodGuard AI &bull; Distributed Flood Warning and Drainage Blockage Detection
+              SensaFlow &bull; Distributed Flood Warning and Drainage Blockage Detection
             </div>
             <div style={{ fontFamily: 'var(--font-mono)' }}>
               Hackathon Prototype &bull; Simulated Demonstration Data

@@ -1,11 +1,11 @@
 /**
- * FloodGuard AI — Key Verification Script
+ * SensaFlow — Key Verification Script
  * Prints CONNECTED / NOT CONFIGURED per key without showing the key.
  */
 
 import fs from 'fs';
 
-console.log('\n--- FLOODGUARD AI: INTEGRATION KEY STATUS ---');
+console.log('\n--- SENSAFLOW: INTEGRATION KEY STATUS ---');
 
 let envContent = '';
 try {

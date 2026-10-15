@@ -70,7 +70,7 @@ export default function LoginForm({ onNavigateToPublicAlerts, onSuccess }) {
         const val = (value || '').trim();
         if (!val) return 'Official government email address is required';
         if (!isValidOfficialEmail(val)) {
-          return 'Enter a valid official government or organizational email (e.g. officer@demo.floodguard.ai)';
+          return 'Enter a valid official government or organizational email (e.g. officer@demo.sensaflow.ai)';
         }
         return null;
       }
@@ -247,7 +247,7 @@ export default function LoginForm({ onNavigateToPublicAlerts, onSuccess }) {
               <Shield size={18} />
             </div>
             <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gov-blue-800)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              FloodGuard AI Portal
+              SensaFlow Portal
             </span>
           </div>
 
@@ -514,7 +514,7 @@ export default function LoginForm({ onNavigateToPublicAlerts, onSuccess }) {
               type="email"
               required
               autoComplete="email"
-              placeholder="e.g. officer@demo.floodguard.ai"
+              placeholder="e.g. officer@demo.sensaflow.ai"
               value={email}
               onChange={(e) => handleChange('email', e.target.value)}
               onBlur={() => handleBlur('email')}

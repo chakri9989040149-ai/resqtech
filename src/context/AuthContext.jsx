@@ -3,7 +3,8 @@ import { authenticateEmployee } from '../services/authService';
 
 const AuthContext = createContext();
 
-const SESSION_STORAGE_KEY = 'floodguard_auth_session';
+const SESSION_STORAGE_KEY = 'sensaflow_auth_session';
+const LEGACY_SESSION_STORAGE_KEY = 'floodguard_auth_session';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -15,7 +16,10 @@ export function AuthProvider({ children }) {
   // Initialize session from sessionStorage (or localStorage if remember was checked)
   useEffect(() => {
     try {
-      const stored = sessionStorage.getItem(SESSION_STORAGE_KEY) || localStorage.getItem(SESSION_STORAGE_KEY);
+      const stored = sessionStorage.getItem(SESSION_STORAGE_KEY) 
+        || localStorage.getItem(SESSION_STORAGE_KEY)
+        || sessionStorage.getItem(LEGACY_SESSION_STORAGE_KEY)
+        || localStorage.getItem(LEGACY_SESSION_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed.sessionExpiry && Date.now() < parsed.sessionExpiry) {
@@ -26,6 +30,8 @@ export function AuthProvider({ children }) {
           // Session expired
           sessionStorage.removeItem(SESSION_STORAGE_KEY);
           localStorage.removeItem(SESSION_STORAGE_KEY);
+          sessionStorage.removeItem(LEGACY_SESSION_STORAGE_KEY);
+          localStorage.removeItem(LEGACY_SESSION_STORAGE_KEY);
         }
       }
     } catch {

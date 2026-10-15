@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useAuth } from './AuthContext';
 
 const FloodGuardContext = createContext(null);
-const STORAGE_KEY = 'floodguard_master_store_v4';
+const STORAGE_KEY = 'sensaflow_master_store_v4';
+const LEGACY_STORAGE_KEY = 'floodguard_master_store_v4';
 
 // Initial Seeds with coordinates for Map and Dual-Sensor telemetry
 const INITIAL_DRAIN_NODES = [
@@ -681,7 +682,7 @@ export function FloodGuardProvider({ children }) {
   // Load from localStorage or defaults
   const [store, setStore] = useState(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         return {
@@ -736,7 +737,7 @@ export function FloodGuardProvider({ children }) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
     } catch (err) {
-      console.error('Failed to persist FloodGuard store:', err);
+      console.error('Failed to persist SensaFlow store:', err);
     }
   }, [store]);
 

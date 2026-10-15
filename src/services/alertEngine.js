@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * FLOODGUARD AI - FLOOD ALERT & CITIZEN WARNING ENGINE (alertEngine.js)
+ * SENSAFLOW - FLOOD ALERT & CITIZEN WARNING ENGINE (alertEngine.js)
  * =============================================================================
  * Core business logic, SMS segment calculation (GSM-7 vs UCS-2), multi-lingual
  * flood alert templates, simulation triggers, channel previews, and mock gateway.
@@ -317,7 +317,7 @@ export function generateExtraChannels(levelId, language, params = {}) {
       : `Floodwaters have cleared into the retention reservoir. Municipal crews have inspected primary culverts. Residents may safely return.`,
     postedTime: 'Just now',
     location: area,
-    actionUrl: 'https://floodguard.gov.in/shelters'
+    actionUrl: 'https://sensaflow.gov.in/shelters'
   };
 
   // 2. Siren / Loudspeaker Public Address Script
@@ -363,7 +363,8 @@ export function generateExtraChannels(levelId, language, params = {}) {
 // =============================================================================
 // 9. LOCAL STORAGE PERSISTENCE & INITIAL SEED DATA
 // =============================================================================
-const STORAGE_KEY = 'floodguard_alert_history';
+const STORAGE_KEY = 'sensaflow_alert_history';
+const LEGACY_STORAGE_KEY = 'floodguard_alert_history';
 
 const SEED_ALERT_HISTORY = [
   {
@@ -430,7 +431,7 @@ const SEED_ALERT_HISTORY = [
 
 export function getAlertHistory() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_ALERT_HISTORY));
       return SEED_ALERT_HISTORY;
