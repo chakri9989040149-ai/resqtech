@@ -13,11 +13,14 @@ import {
   Clock,
   Shield,
   Plus,
+  Minus,
   ArrowRight,
   TrendingUp,
   MapPin,
   RefreshCw,
-  Users
+  Users,
+  Check,
+  AlertCircle
 } from 'lucide-react';
 import { useFloodGuard } from '../context/FloodGuardStore';
 
@@ -29,30 +32,35 @@ export default function OverviewCardDrawer({ onClose, onSwitchTab }) {
     rescueTeams,
     reliefCamps,
     activityLog,
-    acknowledgeAlert,
-    escalateAlert,
-    resolveAlert,
-    dispatchRescueTeam,
-    recallRescueTeam,
-    reassignRescueTeam,
-    addTeamEquipment,
+    selectedMapNodeId,
+    setSelectedMapNodeId,
+    assignTeamToAlert,
+    assignWorkerToBlockage,
+    reassignUnit,
+    markTeamOnScene,
+    markAlertResolved,
+    markDrainCleared,
+    simulateSensorFailure,
+    restorePrimarySensor,
+    simulateBlockageSpike,
     openReliefCamp,
     closeReliefCamp,
     updateCampOccupancy,
     requestCampSupplies,
-    dispatchInspectionCrew,
-    markDrainCleared,
-    markDrainUnderMaintenance,
-    requestDrainRecheck,
     triggerSendAlertForArea
   } = useFloodGuard();
 
-  // Inline modal/action states
-  const [selectedAlertForDispatch, setSelectedAlertForDispatch] = useState(null);
-  const [selectedTeamId, setSelectedTeamId] = useState('');
-  const [dispatchEta, setDispatchEta] = useState(12);
+  // Manual assignment dropdown toggles
+  const [assigningAlertId, setAssigningAlertId] = useState(null);
+  const [selectedTeamForAlert, setSelectedTeamForAlert] = useState('');
 
-  const [selectedAlertForCamp, setSelectedAlertForCamp] = useState(null);
+  const [assigningBlockageId, setAssigningBlockageId] = useState(null);
+  const [selectedCrewForBlockage, setSelectedCrewForBlockage] = useState('');
+
+  const [reassigningTarget, setReassigningTarget] = useState(null); // { id, type }
+  const [reassignSelectedTeam, setReassignSelectedTeam] = useState('');
+
+  // Camp logistics modal
   const [selectedCampToOpen, setSelectedCampToOpen] = useState('');
   const [newCampName, setNewCampName] = useState('');
   const [newCampCapacity, setNewCampCapacity] = useState(600);
@@ -61,14 +69,38 @@ export default function OverviewCardDrawer({ onClose, onSwitchTab }) {
 
   if (!activeDrawer) return null;
 
-  const availableTeams = rescueTeams.filter(t => t.status === 'AVAILABLE' || t.status === 'STANDBY');
-  const suspectedDrains = drainNodes.filter(d => d.blockagePct >= 25 && d.operationalStatus !== 'CLEARED');
+  // Filter lists
+  const availableRescueTeams = rescueTeams.filter(t => (t.type === 'RESCUE' || !t.type) && (t.status === 'AVAILABLE' || t.status === 'STANDBY'));
+  const availableCleaningCrews = rescueTeams.filter(t => t.type === 'CLEANING' && (t.status === 'AVAILABLE' || t.status === 'STANDBY'));
+  const blockedDrains = drainNodes.filter(d => d.blockagePct >= 25 && d.operationalStatus !== 'CLEARED');
 
-  const handleConfirmTeamDispatch = () => {
-    if (!selectedTeamId || !selectedAlertForDispatch) return;
-    dispatchRescueTeam(selectedTeamId, selectedAlertForDispatch.zone, dispatchEta, selectedAlertForDispatch.id);
-    setSelectedAlertForDispatch(null);
-    setSelectedTeamId('');
+  const handleManualAlertAssign = (alertId) => {
+    if (!selectedTeamForAlert) {
+      // Auto-assign nearest available
+      assignTeamToAlert(alertId, null);
+    } else {
+      assignTeamToAlert(alertId, selectedTeamForAlert);
+    }
+    setAssigningAlertId(null);
+    setSelectedTeamForAlert('');
+  };
+
+  const handleManualBlockageAssign = (drainId) => {
+    if (!selectedCrewForBlockage) {
+      // Auto-assign nearest available
+      assignWorkerToBlockage(drainId, null);
+    } else {
+      assignWorkerToBlockage(drainId, selectedCrewForBlockage);
+    }
+    setAssigningBlockageId(null);
+    setSelectedCrewForBlockage('');
+  };
+
+  const handleReassignSubmit = () => {
+    if (!reassigningTarget || !reassignSelectedTeam) return;
+    reassignUnit(reassigningTarget.id, reassignSelectedTeam, reassigningTarget.type);
+    setReassigningTarget(null);
+    setReassignSelectedTeam('');
   };
 
   const handleConfirmOpenCamp = () => {
@@ -83,8 +115,8 @@ export default function OverviewCardDrawer({ onClose, onSwitchTab }) {
       if (!selectedCampToOpen) return;
       openReliefCamp({ id: selectedCampToOpen });
     }
-    setSelectedAlertForCamp(null);
     setIsCreatingNewCamp(false);
+    setSelectedCampToOpen('');
   };
 
   return (
@@ -95,12 +127,12 @@ export default function OverviewCardDrawer({ onClose, onSwitchTab }) {
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0, 0, 0, 0.7)',
-        backdropFilter: 'blur(5px)',
+        background: 'rgba(0, 0, 0, 0.72)',
+        backdropFilter: 'blur(6px)',
         zIndex: 9999,
         display: 'flex',
         justifyContent: 'flex-end',
-        animation: 'fadeIn 0.2s ease-out'
+        animation: 'fadeIn 0.15s ease-out'
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -109,9 +141,10 @@ export default function OverviewCardDrawer({ onClose, onSwitchTab }) {
       <div
         role="dialog"
         aria-modal="true"
+        aria-labelledby="drawer-heading"
         style={{
           width: '100%',
-          maxWidth: '560px',
+          maxWidth: '580px',
           height: '100%',
           background: 'var(--bg-card)',
           borderLeft: '1px solid var(--border-medium)',
@@ -143,17 +176,18 @@ export default function OverviewCardDrawer({ onClose, onSwitchTab }) {
                 color: '#3B82F6',
                 background: 'rgba(59, 130, 246, 0.12)',
                 padding: '2px 8px',
-                borderRadius: '4px'
+                borderRadius: '4px',
+                letterSpacing: '0.05em'
               }}>
                 [SIMULATED DATA]
               </span>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Interactive Operational Panel</span>
             </div>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '4px 0 0 0' }}>
+            <h3 id="drawer-heading" style={{ fontSize: '18px', fontWeight: 800, margin: '4px 0 0 0' }}>
               {activeDrawer === 'alerts' && 'Active Flood Alerts & Rapid Dispatch'}
               {activeDrawer === 'blockages' && 'Suspected Silt & Debris Blockages'}
-              {activeDrawer === 'nodes' && 'Drain Telemetry Nodes Health'}
-              {activeDrawer === 'teams' && 'Rescue Team Deployment Management'}
+              {activeDrawer === 'nodes' && 'Drain Telemetry & Dual-Sensor Failover'}
+              {activeDrawer === 'teams' && 'Emergency Units & Desilting Crews'}
               {activeDrawer === 'camps' && 'Relief Shelter Operations & Logistics'}
               {activeDrawer === 'activity' && 'Global Incident Audit & Activity Log'}
             </h3>
@@ -168,14 +202,17 @@ export default function OverviewCardDrawer({ onClose, onSwitchTab }) {
               borderRadius: '6px',
               padding: '6px',
               color: 'var(--text-primary)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* DRAWER BODY CONTENT */}
+        {/* DRAWER BODY */}
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
 
           {/* =========================================================================
@@ -184,178 +221,727 @@ export default function OverviewCardDrawer({ onClose, onSwitchTab }) {
           {activeDrawer === 'alerts' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Directly dispatch field teams, open relief centers, or trigger citizen warnings for each inundation alert.
+                Directly assign emergency teams, view real-time inundation severity, or mark resolved.
               </div>
 
-              {floodAlerts.map(alert => {
-                const isCritical = alert.severity === 'CRITICAL';
-                return (
-                  <div
-                    key={alert.id}
-                    style={{
-                      background: 'var(--bg-secondary)',
-                      border: `1px solid ${isCritical ? 'rgba(239, 68, 68, 0.4)' : 'var(--border-medium)'}`,
-                      borderLeft: `5px solid ${isCritical ? '#EF4444' : '#F59E0B'}`,
-                      borderRadius: 'var(--radius-md)',
-                      padding: '14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '10px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--text-primary)' }}>
-                          {alert.title}
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <MapPin size={12} color="var(--gov-blue-700)" />
-                          <span>{alert.zone} &bull; {alert.waterLevel}</span>
-                        </div>
-                      </div>
+              {floodAlerts.filter(a => a.status !== 'RESOLVED').length === 0 ? (
+                <div style={{
+                  padding: '36px 20px',
+                  textAlign: 'center',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--status-normal)',
+                  fontWeight: 600,
+                  fontSize: '13px'
+                }}>
+                  ✓ No active flood alerts! All inundation conditions have been resolved.
+                </div>
+              ) : (
+                floodAlerts.map(alert => {
+                  const isCritical = alert.severity === 'CRITICAL';
+                  const isAssigned = alert.status === 'ASSIGNED';
+                  const isResolved = alert.status === 'RESOLVED';
+                  const isAssigningThis = assigningAlertId === alert.id;
 
-                      <span style={{
-                        fontSize: '10px',
-                        fontWeight: 800,
-                        color: isCritical ? '#EF4444' : '#F59E0B',
-                        background: isCritical ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
-                        padding: '2px 8px',
-                        borderRadius: '4px'
-                      }}>
-                        {alert.status}
-                      </span>
-                    </div>
-
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                      {alert.riskReason}
-                    </div>
-
-                    {/* Assigned Team Chip */}
-                    {alert.assignedTeamId && (
-                      <div style={{
-                        fontSize: '11px',
-                        color: '#10B981',
-                        background: 'rgba(16, 185, 129, 0.1)',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
+                  return (
+                    <div
+                      key={alert.id}
+                      style={{
+                        background: 'var(--bg-secondary)',
+                        border: `1px solid ${isCritical ? 'rgba(239, 68, 68, 0.4)' : 'var(--border-medium)'}`,
+                        borderLeft: `5px solid ${isResolved ? '#10B981' : isCritical ? '#EF4444' : '#F59E0B'}`,
+                        borderRadius: 'var(--radius-md)',
+                        padding: '16px',
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        <CheckCircle2 size={13} />
-                        <span>Team Assigned: <strong>{alert.assignedTeamId}</strong> (En Route / On Scene)</span>
+                        flexDirection: 'column',
+                        gap: '10px',
+                        opacity: isResolved ? 0.6 : 1
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--text-primary)' }}>
+                            {alert.title}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <MapPin size={12} color="var(--gov-blue-700)" />
+                            <span>{alert.zone} &bull; Water: <strong>{alert.waterLevel}</strong> &bull; Rain: {alert.rainfall}</span>
+                          </div>
+                        </div>
+
+                        <span style={{
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          color: isResolved ? '#10B981' : isCritical ? '#EF4444' : '#F59E0B',
+                          background: isResolved ? 'rgba(16, 185, 129, 0.12)' : isCritical ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          textTransform: 'uppercase'
+                        }}>
+                          {alert.status}
+                        </span>
                       </div>
-                    )}
 
-                    {/* Action Buttons Strip */}
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                      gap: '6px',
-                      paddingTop: '8px',
-                      borderTop: '1px solid var(--border-light)'
-                    }} role="group" aria-label={`Actions for alert ${alert.id}`}>
-                      {/* Dispatch Rescue Team */}
-                      <button
-                        type="button"
-                        aria-label={`Dispatch rescue team for ${alert.zone}`}
-                        onClick={() => setSelectedAlertForDispatch(alert)}
-                        style={{
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                        {alert.riskReason}
+                      </div>
+
+                      {/* Assigned Team Chip & On Scene indicator */}
+                      {alert.assignedTeamId && (
+                        <div style={{
+                          fontSize: '11px',
+                          color: '#10B981',
+                          background: 'rgba(16, 185, 129, 0.1)',
+                          border: '1px solid rgba(16, 185, 129, 0.25)',
                           padding: '6px 10px',
                           borderRadius: '4px',
-                          background: 'var(--gov-blue-700)',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <LifeBuoy size={12} />
-                        <span>Dispatch Team</span>
-                      </button>
+                          justifyContent: 'space-between',
+                          gap: '6px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <CheckCircle2 size={13} color="#10B981" />
+                            <span>Team Assigned: <strong>{alert.assignedTeamName || alert.assignedTeamId}</strong></span>
+                          </div>
+                          <span style={{ fontSize: '10px', opacity: 0.8 }}>{alert.assignedAt || 'Dispatched'}</span>
+                        </div>
+                      )}
 
-                      {/* Open Relief Camp */}
-                      <button
-                        type="button"
-                        aria-label={`Open relief camp for ${alert.zone}`}
-                        onClick={() => setSelectedAlertForCamp(alert)}
-                        style={{
-                          padding: '6px 10px',
-                          borderRadius: '4px',
+                      {/* Manual Assignment Dropdown inline */}
+                      {isAssigningThis && (
+                        <div style={{
                           background: 'var(--bg-primary)',
-                          color: 'var(--text-primary)',
                           border: '1px solid var(--border-medium)',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
+                          padding: '12px',
+                          borderRadius: 'var(--radius-sm)',
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <Building size={12} color="var(--water-cyan-600)" />
-                        <span>Open Shelter</span>
-                      </button>
+                          flexDirection: 'column',
+                          gap: '8px'
+                        }}>
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gov-blue-700)' }}>
+                            Choose an Available Rescue Team (or Auto-Match Nearest):
+                          </div>
+                          <select
+                            value={selectedTeamForAlert}
+                            onChange={(e) => setSelectedTeamForAlert(e.target.value)}
+                            style={{
+                              padding: '8px',
+                              borderRadius: '4px',
+                              border: '1px solid var(--border-medium)',
+                              background: 'var(--bg-card)',
+                              color: 'var(--text-primary)',
+                              fontSize: '12px'
+                            }}
+                          >
+                            <option value="">⚡ Auto-Match Nearest Available Team</option>
+                            {availableRescueTeams.map(t => (
+                              <option key={t.id} value={t.id}>
+                                {t.name} ({t.zone}) &bull; {t.personnel} Personnel, {t.boats} Boats
+                              </option>
+                            ))}
+                          </select>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              onClick={() => setAssigningAlertId(null)}
+                              style={{
+                                padding: '5px 10px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--border-medium)',
+                                background: 'transparent',
+                                color: 'var(--text-muted)',
+                                fontSize: '11px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleManualAlertAssign(alert.id)}
+                              style={{
+                                padding: '5px 12px',
+                                borderRadius: '4px',
+                                border: 'none',
+                                background: 'var(--gov-blue-700)',
+                                color: '#FFFFFF',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Confirm Assignment
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
-                      {/* Send Citizen Alert */}
-                      <button
-                        type="button"
-                        aria-label={`Send citizen flood alert for ${alert.zone}`}
-                        onClick={() => {
-                          triggerSendAlertForArea(alert.zone, alert.severity);
-                          onClose();
-                          if (onSwitchTab) onSwitchTab('alerts');
-                        }}
-                        style={{
-                          padding: '6px 10px',
-                          borderRadius: '4px',
-                          background: 'rgba(239, 68, 68, 0.1)',
-                          color: '#EF4444',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <Send size={12} />
-                        <span>Send SMS Alert</span>
-                      </button>
+                      {/* Action Buttons Strip */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                        gap: '6px',
+                        paddingTop: '8px',
+                        borderTop: '1px solid var(--border-light)'
+                      }}>
+                        {/* Assign Team Button */}
+                        {!isAssigned && !isResolved && (
+                          <button
+                            type="button"
+                            onClick={() => setAssigningAlertId(alert.id)}
+                            style={{
+                              padding: '7px 10px',
+                              borderRadius: '4px',
+                              background: 'var(--gov-blue-700)',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <LifeBuoy size={12} />
+                            <span>Assign Team</span>
+                          </button>
+                        )}
 
-                      {/* Acknowledge / Resolve */}
-                      {alert.status === 'ACTIVE' ? (
+                        {/* Reassign Team Button if already assigned */}
+                        {isAssigned && !isResolved && (
+                          <button
+                            type="button"
+                            onClick={() => setAssigningAlertId(alert.id)}
+                            style={{
+                              padding: '7px 10px',
+                              borderRadius: '4px',
+                              background: 'var(--bg-primary)',
+                              color: 'var(--text-primary)',
+                              border: '1px solid var(--border-medium)',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <RefreshCw size={12} />
+                            <span>Reassign Team</span>
+                          </button>
+                        )}
+
+                        {/* Highlight on Map */}
                         <button
                           type="button"
-                          aria-label={`Acknowledge alert ${alert.id}`}
-                          onClick={() => acknowledgeAlert(alert.id)}
+                          onClick={() => {
+                            if (alert.drainNodeId) setSelectedMapNodeId(alert.drainNodeId);
+                            onClose();
+                            if (onSwitchTab) onSwitchTab('overview');
+                          }}
                           style={{
-                            padding: '6px 10px',
+                            padding: '7px 10px',
                             borderRadius: '4px',
                             background: 'var(--bg-primary)',
-                            color: 'var(--text-secondary)',
-                            border: '1px solid var(--border-light)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--border-medium)',
                             fontSize: '11px',
                             fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <MapPin size={12} color="var(--gov-blue-700)" />
+                          <span>View on Map</span>
+                        </button>
+
+                        {/* Send Citizen Alert */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            triggerSendAlertForArea(alert.zone, alert.severity);
+                            onClose();
+                            if (onSwitchTab) onSwitchTab('alerts');
+                          }}
+                          style={{
+                            padding: '7px 10px',
+                            borderRadius: '4px',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            color: '#EF4444',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Send size={12} />
+                          <span>Send SMS Alert</span>
+                        </button>
+
+                        {/* Mark Resolved */}
+                        {!isResolved ? (
+                          <button
+                            type="button"
+                            onClick={() => markAlertResolved(alert.id)}
+                            style={{
+                              padding: '7px 10px',
+                              borderRadius: '4px',
+                              background: 'rgba(16, 185, 129, 0.1)',
+                              color: '#10B981',
+                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Mark Resolved
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: '#10B981', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            ✓ Resolved
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* =========================================================================
+              DRAWER 2: SUSPECTED BLOCKAGES
+             ========================================================================= */}
+          {activeDrawer === 'blockages' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Drainage channels currently restricted with severe silt and trash accumulation. Assign cleaning crews or mark cleared.
+              </div>
+
+              {blockedDrains.length === 0 ? (
+                <div style={{
+                  padding: '36px 20px',
+                  textAlign: 'center',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--status-normal)',
+                  fontWeight: 600,
+                  fontSize: '13px'
+                }}>
+                  ✓ All suspected stormwater blockages have been cleared! Channels operating at nominal capacity.
+                </div>
+              ) : (
+                blockedDrains.map(drain => {
+                  const isAssigningThis = assigningBlockageId === drain.id;
+                  const isCritical = drain.blockagePct >= 60;
+
+                  return (
+                    <div
+                      key={drain.id}
+                      style={{
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-medium)',
+                        borderLeft: `5px solid ${isCritical ? '#EF4444' : '#F59E0B'}`,
+                        borderRadius: 'var(--radius-md)',
+                        padding: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--gov-blue-700)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                              {drain.id}
+                            </span>
+                            <span style={{
+                              fontSize: '9px',
+                              padding: '1px 5px',
+                              borderRadius: '3px',
+                              background: 'var(--bg-tertiary)',
+                              color: 'var(--text-muted)'
+                            }}>
+                              {drain.zone}
+                            </span>
+                          </div>
+                          <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--text-primary)', marginTop: '2px' }}>
+                            {drain.location}
+                          </div>
+                        </div>
+
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: 800,
+                          color: isCritical ? '#EF4444' : '#F59E0B',
+                          background: isCritical ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          fontFamily: 'var(--font-mono)'
+                        }}>
+                          {drain.blockagePct}% Blocked
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                        {drain.reason}
+                      </div>
+
+                      {/* Assigned Worker Info */}
+                      {drain.assignedWorker ? (
+                        <div style={{
+                          fontSize: '11px',
+                          color: '#3B82F6',
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          border: '1px solid rgba(59, 130, 246, 0.25)',
+                          padding: '6px 10px',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Wrench size={13} color="#3B82F6" />
+                            <span>Assigned Worker: <strong>{drain.assignedWorker}</strong></span>
+                          </div>
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: '#3B82F6' }}>In Transit / On Site</span>
+                        </div>
+                      ) : (
+                        <div style={{
+                          fontSize: '11px',
+                          color: '#F59E0B',
+                          background: 'rgba(245, 158, 11, 0.08)',
+                          border: '1px solid rgba(245, 158, 11, 0.25)',
+                          padding: '6px 10px',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <AlertCircle size={13} />
+                          <span>No cleaning worker assigned yet. Blockage restricting channel!</span>
+                        </div>
+                      )}
+
+                      {/* Manual Assignment Dropdown inline */}
+                      {isAssigningThis && (
+                        <div style={{
+                          background: 'var(--bg-primary)',
+                          border: '1px solid var(--border-medium)',
+                          padding: '12px',
+                          borderRadius: 'var(--radius-sm)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px'
+                        }}>
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gov-blue-700)' }}>
+                            Choose an Available Desilting Crew (or Auto-Match Nearest):
+                          </div>
+                          <select
+                            value={selectedCrewForBlockage}
+                            onChange={(e) => setSelectedCrewForBlockage(e.target.value)}
+                            style={{
+                              padding: '8px',
+                              borderRadius: '4px',
+                              border: '1px solid var(--border-medium)',
+                              background: 'var(--bg-card)',
+                              color: 'var(--text-primary)',
+                              fontSize: '12px'
+                            }}
+                          >
+                            <option value="">⚡ Auto-Match Nearest Cleaning Crew</option>
+                            {availableCleaningCrews.map(c => (
+                              <option key={c.id} value={c.id}>
+                                {c.name} ({c.leadWorker}) &bull; {c.zone}
+                              </option>
+                            ))}
+                          </select>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              onClick={() => setAssigningBlockageId(null)}
+                              style={{
+                                padding: '5px 10px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--border-medium)',
+                                background: 'transparent',
+                                color: 'var(--text-muted)',
+                                fontSize: '11px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleManualBlockageAssign(drain.id)}
+                              style={{
+                                padding: '5px 12px',
+                                borderRadius: '4px',
+                                border: 'none',
+                                background: 'var(--gov-blue-700)',
+                                color: '#FFFFFF',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Confirm Assignment
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Actions strip */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                        gap: '6px',
+                        paddingTop: '8px',
+                        borderTop: '1px solid var(--border-light)'
+                      }}>
+                        {/* Assign / Reassign Worker Button */}
+                        <button
+                          type="button"
+                          onClick={() => setAssigningBlockageId(drain.id)}
+                          style={{
+                            padding: '7px 10px',
+                            borderRadius: '4px',
+                            background: drain.assignedWorker ? 'var(--bg-primary)' : 'var(--gov-blue-700)',
+                            color: drain.assignedWorker ? 'var(--text-primary)' : '#FFFFFF',
+                            border: drain.assignedWorker ? '1px solid var(--border-medium)' : 'none',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Wrench size={12} />
+                          <span>{drain.assignedWorker ? 'Reassign Worker' : 'Assign Worker'}</span>
+                        </button>
+
+                        {/* View on Map */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedMapNodeId(drain.id);
+                            onClose();
+                            if (onSwitchTab) onSwitchTab('overview');
+                          }}
+                          style={{
+                            padding: '7px 10px',
+                            borderRadius: '4px',
+                            background: 'var(--bg-primary)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--border-medium)',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <MapPin size={12} color="var(--gov-blue-700)" />
+                          <span>Highlight on Map</span>
+                        </button>
+
+                        {/* Mark Cleared Button */}
+                        <button
+                          type="button"
+                          onClick={() => markDrainCleared(drain.id)}
+                          style={{
+                            padding: '7px 10px',
+                            borderRadius: '4px',
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            color: '#10B981',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <CheckCircle2 size={12} />
+                          <span>Mark Cleared</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* =========================================================================
+              DRAWER 3: DRAIN TELEMETRY & DUAL-SENSOR FAILOVER
+             ========================================================================= */}
+          {activeDrawer === 'nodes' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.25)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '12px',
+                fontSize: '12px',
+                color: 'var(--text-secondary)'
+              }}>
+                <strong style={{ color: 'var(--gov-blue-700)' }}>Dual-Sensor Automatic Failover:</strong> Each node carries a Primary Ultrasonic Sensor and a Submerged Pressure Transducer. If a primary fails, the backup activates automatically and the node stays online.
+              </div>
+
+              {drainNodes.map(node => {
+                const isFailoverActive = node.sensorHealth === 'BACKUP_ACTIVE';
+                const isPrimaryFailed = node.primarySensor?.status === 'FAILED';
+                const isSelectedOnMap = selectedMapNodeId === node.id;
+
+                return (
+                  <div
+                    key={node.id}
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      border: `1px solid ${isSelectedOnMap ? 'var(--gov-blue-700)' : 'var(--border-light)'}`,
+                      borderRadius: 'var(--radius-md)',
+                      padding: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      boxShadow: isSelectedOnMap ? '0 0 0 2px rgba(59, 130, 246, 0.3)' : 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--gov-blue-700)', fontFamily: 'var(--font-mono)' }}>
+                            {node.id}
+                          </span>
+                          <span style={{
+                            fontSize: '9px',
+                            fontWeight: 800,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: node.operationalStatus === 'BLOCKED' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                            color: node.operationalStatus === 'BLOCKED' ? '#EF4444' : '#10B981',
+                            textTransform: 'uppercase'
+                          }}>
+                            {node.operationalStatus === 'BLOCKED' ? 'Blocked' : 'Online'}
+                          </span>
+                        </div>
+                        <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--text-primary)', marginTop: '2px' }}>
+                          {node.location}
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                          {node.waterLevel}
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                          Blockage: {node.blockagePct}%
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* DUAL SENSOR TELEMETRY CARDS */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '8px',
+                      background: 'var(--bg-primary)',
+                      padding: '10px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-light)'
+                    }}>
+                      {/* Primary Sensor Card */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)' }}>PRIMARY SENSOR</span>
+                          <span style={{
+                            fontSize: '9px',
+                            fontWeight: 800,
+                            padding: '1px 5px',
+                            borderRadius: '3px',
+                            background: isPrimaryFailed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                            color: isPrimaryFailed ? '#EF4444' : '#10B981'
+                          }}>
+                            {node.primarySensor?.status || 'ACTIVE'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {node.primarySensor?.name || 'Ultrasonic Sensor'}
+                        </div>
+                        <div style={{ fontSize: '10px', color: isPrimaryFailed ? '#EF4444' : 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                          {node.primarySensor?.reading || node.waterLevel}
+                        </div>
+                      </div>
+
+                      {/* Backup Sensor Card */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)' }}>BACKUP SENSOR</span>
+                          <span style={{
+                            fontSize: '9px',
+                            fontWeight: 800,
+                            padding: '1px 5px',
+                            borderRadius: '3px',
+                            background: isFailoverActive ? 'rgba(59, 130, 246, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                            color: isFailoverActive ? '#3B82F6' : 'var(--text-muted)'
+                          }}>
+                            {node.backupSensor?.status || 'STANDBY'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {node.backupSensor?.name || 'Pressure Transducer'}
+                        </div>
+                        <div style={{ fontSize: '10px', color: isFailoverActive ? '#3B82F6' : 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                          {isFailoverActive ? (node.backupSensor?.reading || node.waterLevel) : 'Standby Hot-Spare'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sensor Failover Simulation Action */}
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {!isPrimaryFailed ? (
+                        <button
+                          type="button"
+                          onClick={() => simulateSensorFailure(node.id)}
+                          style={{
+                            flex: 1,
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            color: '#EF4444',
+                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                            fontSize: '11px',
+                            fontWeight: 700,
                             cursor: 'pointer'
                           }}
                         >
-                          Acknowledge
+                          Simulate Primary Failure
                         </button>
                       ) : (
                         <button
                           type="button"
-                          aria-label={`Mark alert ${alert.id} resolved`}
-                          onClick={() => resolveAlert(alert.id)}
+                          onClick={() => restorePrimarySensor(node.id)}
                           style={{
+                            flex: 1,
                             padding: '6px 10px',
                             borderRadius: '4px',
                             background: 'rgba(16, 185, 129, 0.1)',
@@ -366,121 +952,15 @@ export default function OverviewCardDrawer({ onClose, onSwitchTab }) {
                             cursor: 'pointer'
                           }}
                         >
-                          Resolve Alert
+                          Restore Primary Sensor
                         </button>
                       )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
 
-          {/* =========================================================================
-              DRAWER 2: SUSPECTED BLOCKAGES
-             ========================================================================= */}
-          {activeDrawer === 'blockages' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Drainage channels currently restricted with severe silt and trash accumulation.
-              </div>
-
-              {suspectedDrains.length === 0 ? (
-                <div style={{
-                  padding: '30px',
-                  textAlign: 'center',
-                  background: 'var(--bg-secondary)',
-                  borderRadius: 'var(--radius-md)',
-                  color: '#10B981',
-                  fontWeight: 600,
-                  fontSize: '13px'
-                }}>
-                  ✓ All suspected stormwater blockages have been cleared! Channels operating normally.
-                </div>
-              ) : (
-                suspectedDrains.map(drain => (
-                  <div
-                    key={drain.id}
-                    style={{
-                      background: 'var(--bg-secondary)',
-                      border: '1px solid var(--border-medium)',
-                      borderLeft: '5px solid #F59E0B',
-                      borderRadius: 'var(--radius-md)',
-                      padding: '14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{drain.id}</span>
-                        <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--text-primary)' }}>{drain.location}</div>
-                      </div>
-                      <span style={{
-                        fontSize: '12px',
-                        fontWeight: 800,
-                        color: drain.blockagePct >= 60 ? '#EF4444' : '#F59E0B',
-                        fontFamily: 'var(--font-mono)'
-                      }}>
-                        {drain.blockagePct}% Blocked
-                      </span>
-                    </div>
-
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                      {drain.reason}
-                    </div>
-
-                    {drain.operationalStatus === 'CREW_DISPATCHED' && (
-                      <div style={{
-                        fontSize: '11px',
-                        color: '#3B82F6',
-                        background: 'rgba(59, 130, 246, 0.1)',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        fontWeight: 600
-                      }}>
-                        🚜 Inspection &amp; Desilting Crew Dispatched to Site
-                      </div>
-                    )}
-
-                    <div style={{
-                      display: 'flex',
-                      gap: '8px',
-                      paddingTop: '8px',
-                      borderTop: '1px solid var(--border-light)'
-                    }} role="group" aria-label={`Actions for drainage channel ${drain.id}`}>
-                      {/* Dispatch Crew */}
+                      {/* Trigger Blockage Spike Demo Button */}
                       <button
                         type="button"
-                        aria-label={`Dispatch inspection crew for ${drain.id}`}
-                        onClick={() => dispatchInspectionCrew(drain.id)}
-                        disabled={drain.operationalStatus === 'CREW_DISPATCHED'}
+                        onClick={() => simulateBlockageSpike(node.id, 88)}
                         style={{
-                          flex: 1,
-                          padding: '6px 10px',
-                          borderRadius: '4px',
-                          background: drain.operationalStatus === 'CREW_DISPATCHED' ? 'var(--bg-tertiary)' : 'var(--gov-blue-700)',
-                          color: drain.operationalStatus === 'CREW_DISPATCHED' ? 'var(--text-muted)' : '#FFFFFF',
-                          border: 'none',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          cursor: drain.operationalStatus === 'CREW_DISPATCHED' ? 'not-allowed' : 'pointer'
-                        }}
-                      >
-                        {drain.operationalStatus === 'CREW_DISPATCHED' ? 'Crew On Site' : 'Dispatch Crew'}
-                      </button>
-
-                      {/* Schedule Maintenance */}
-                      <button
-                        type="button"
-                        aria-label={`Schedule maintenance for ${drain.id}`}
-                        onClick={() => {
-                          onClose();
-                          if (onSwitchTab) onSwitchTab('maintenance');
-                        }}
-                        style={{
-                          flex: 1,
                           padding: '6px 10px',
                           borderRadius: '4px',
                           background: 'var(--bg-primary)',
@@ -491,547 +971,378 @@ export default function OverviewCardDrawer({ onClose, onSwitchTab }) {
                           cursor: 'pointer'
                         }}
                       >
-                        Schedule Upkeep
+                        Simulate Blockage Spike
                       </button>
 
-                      {/* Mark Cleared */}
+                      {/* Highlight on Map */}
                       <button
                         type="button"
-                        aria-label={`Mark blockage cleared on ${drain.id}`}
-                        onClick={() => markDrainCleared(drain.id)}
+                        onClick={() => {
+                          setSelectedMapNodeId(node.id);
+                          onClose();
+                          if (onSwitchTab) onSwitchTab('overview');
+                        }}
                         style={{
-                          flex: 1,
                           padding: '6px 10px',
                           borderRadius: '4px',
-                          background: 'rgba(16, 185, 129, 0.1)',
-                          color: '#10B981',
-                          border: '1px solid rgba(16, 185, 129, 0.3)',
+                          background: 'var(--bg-primary)',
+                          color: 'var(--text-primary)',
+                          border: '1px solid var(--border-medium)',
                           fontSize: '11px',
-                          fontWeight: 700,
+                          fontWeight: 600,
                           cursor: 'pointer'
                         }}
                       >
-                        Mark Cleared
+                        Select on Map
                       </button>
                     </div>
                   </div>
-                ))
-              )}
+                );
+              })}
             </div>
           )}
 
           {/* =========================================================================
-              DRAWER 3: DRAIN TELEMETRY NODES
-             ========================================================================= */}
-          {activeDrawer === 'nodes' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Field IoT sensing nodes transmitting acoustic blockage and water stage depth.
-              </div>
-
-              {drainNodes.map(node => (
-                <div
-                  key={node.id}
-                  style={{
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-light)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{node.id}</span>
-                      <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--text-primary)' }}>{node.location}</div>
-                    </div>
-
-                    <span style={{
-                      fontSize: '10px',
-                      fontWeight: 800,
-                      color: node.status === 'CRITICAL' ? '#EF4444' : node.status === 'WARNING' ? '#F59E0B' : '#10B981',
-                      background: node.status === 'CRITICAL' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)',
-                      padding: '2px 8px',
-                      borderRadius: '4px'
-                    }}>
-                      {node.operationalStatus === 'UNDER_MAINTENANCE' ? 'UNDER MAINTENANCE' : node.status}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', fontSize: '11px' }}>
-                    <div style={{ background: 'var(--bg-primary)', padding: '6px', borderRadius: '4px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Water Stage: </span>
-                      <strong>{node.waterLevel}</strong>
-                    </div>
-                    <div style={{ background: 'var(--bg-primary)', padding: '6px', borderRadius: '4px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Blockage: </span>
-                      <strong style={{ color: node.blockagePct >= 60 ? '#EF4444' : 'inherit' }}>{node.blockagePct}%</strong>
-                    </div>
-                    <div style={{ background: 'var(--bg-primary)', padding: '6px', borderRadius: '4px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Battery: </span>
-                      <strong>{node.battery}%</strong>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px', paddingTop: '6px', borderTop: '1px solid var(--border-light)' }}>
-                    <button
-                      type="button"
-                      aria-label={`Ping node ${node.id}`}
-                      onClick={() => requestDrainRecheck(node.id)}
-                      style={{
-                        flex: 1,
-                        padding: '6px',
-                        background: 'var(--bg-primary)',
-                        border: '1px solid var(--border-medium)',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        color: 'var(--text-primary)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <RefreshCw size={11} />
-                      <span>Ping Diagnostic</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      aria-label={`Mark node ${node.id} under maintenance`}
-                      onClick={() => markDrainUnderMaintenance(node.id)}
-                      style={{
-                        flex: 1,
-                        padding: '6px',
-                        background: 'var(--bg-primary)',
-                        border: '1px solid var(--border-medium)',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        color: '#F59E0B',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <Wrench size={11} />
-                      <span>Flag Maintenance</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      aria-label={`View node ${node.id} in drain monitoring`}
-                      onClick={() => {
-                        onClose();
-                        if (onSwitchTab) onSwitchTab('drain-monitoring');
-                      }}
-                      style={{
-                        flex: 1,
-                        padding: '6px',
-                        background: 'var(--gov-blue-700)',
-                        border: 'none',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        color: '#FFFFFF',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      View in Tab 2
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* =========================================================================
-              DRAWER 4: RESCUE TEAMS
+              DRAWER 4: RESCUE TEAMS & CLEANING CREWS
              ========================================================================= */}
           {activeDrawer === 'teams' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Field disaster mobilization crews, boats and emergency ambulances.
+                Active emergency response teams and municipal cleaning crews with real-time status and task assignment.
               </div>
 
-              {rescueTeams.map(team => (
-                <div
-                  key={team.id}
-                  style={{
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-light)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--text-primary)' }}>{team.name}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Zone: {team.zone}</div>
-                    </div>
-                    <span style={{
-                      fontSize: '10px',
-                      fontWeight: 800,
-                      color: team.status === 'ON SCENE' ? '#EF4444' : team.status === 'DISPATCHED' ? '#3B82F6' : '#10B981',
-                      background: 'rgba(255,255,255,0.06)',
-                      padding: '2px 8px',
-                      borderRadius: '4px'
-                    }}>
-                      {team.status}
-                    </span>
-                  </div>
+              {rescueTeams.map(team => {
+                const isDispatched = team.status === 'DISPATCHED';
+                const isOnScene = team.status === 'ON SCENE';
+                const isAvailable = team.status === 'AVAILABLE' || team.status === 'STANDBY';
+                const isCleaningCrew = team.type === 'CLEANING';
 
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                    Personnel: <strong>{team.personnel}</strong> &bull; Boats: <strong>{team.boats}</strong> &bull; Ambulances: <strong>{team.ambulances}</strong>
-                    {team.target && (
-                      <div style={{ color: 'var(--gov-blue-700)', fontWeight: 600, marginTop: '2px' }}>
-                        Active Mission: {team.target} {team.etaMinutes > 0 && `(ETA ${team.etaMinutes}m)`}
+                return (
+                  <div
+                    key={team.id}
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-medium)',
+                      borderLeft: `5px solid ${isOnScene ? '#10B981' : isDispatched ? '#3B82F6' : '#94A3B8'}`,
+                      borderRadius: 'var(--radius-md)',
+                      padding: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{
+                            fontSize: '9px',
+                            fontWeight: 800,
+                            padding: '1px 5px',
+                            borderRadius: '3px',
+                            background: isCleaningCrew ? 'rgba(245, 158, 11, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                            color: isCleaningCrew ? '#F59E0B' : '#3B82F6'
+                          }}>
+                            {isCleaningCrew ? 'DESILTING CREW' : 'RESCUE UNIT'}
+                          </span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                            {team.id}
+                          </span>
+                        </div>
+                        <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--text-primary)', marginTop: '2px' }}>
+                          {team.name}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {team.role} &bull; Base: {team.zone}
+                        </div>
+                      </div>
+
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        color: isOnScene ? '#10B981' : isDispatched ? '#3B82F6' : 'var(--text-muted)',
+                        background: isOnScene ? 'rgba(16, 185, 129, 0.12)' : isDispatched ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-tertiary)',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        textTransform: 'uppercase'
+                      }}>
+                        {team.status}
+                      </span>
+                    </div>
+
+                    {/* Personnel & Assets */}
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      {team.leadWorker && <div>Lead: <strong>{team.leadWorker}</strong></div>}
+                      <div>Personnel: <strong>{team.personnel} Staff</strong> {team.boats ? `&bull; ${team.boats} Inflatable Boats` : ''} {team.equipment ? `&bull; ${team.equipment}` : ''}</div>
+                    </div>
+
+                    {/* Current Task / Target */}
+                    {team.target ? (
+                      <div style={{
+                        fontSize: '11px',
+                        color: isOnScene ? '#10B981' : '#3B82F6',
+                        background: isOnScene ? 'rgba(16, 185, 129, 0.08)' : 'rgba(59, 130, 246, 0.08)',
+                        padding: '6px 10px',
+                        borderRadius: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}>
+                        <span>Current Target: <strong>{team.target}</strong></span>
+                        <span style={{ fontSize: '10px' }}>{isOnScene ? 'On Scene' : `ETA ${team.etaMinutes || 10}m`}</span>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        No active task assigned. Unit is on standby and ready for dispatch.
                       </div>
                     )}
+
+                    {/* Action buttons */}
+                    <div style={{
+                      display: 'flex',
+                      gap: '6px',
+                      paddingTop: '8px',
+                      borderTop: '1px solid var(--border-light)'
+                    }}>
+                      {isDispatched && (
+                        <button
+                          type="button"
+                          onClick={() => markTeamOnScene(team.id)}
+                          style={{
+                            flex: 1,
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            color: '#10B981',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Mark On Scene
+                        </button>
+                      )}
+
+                      {(isDispatched || isOnScene) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (team.assignedTargetId) {
+                              if (team.type === 'CLEANING') markDrainCleared(team.assignedTargetId);
+                              else markAlertResolved(team.assignedTargetId);
+                            }
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            background: 'var(--bg-primary)',
+                            color: 'var(--text-secondary)',
+                            border: '1px solid var(--border-medium)',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Mark Task Resolved
+                        </button>
+                      )}
+                    </div>
                   </div>
-
-                  <div style={{ display: 'flex', gap: '8px', paddingTop: '6px', borderTop: '1px solid var(--border-light)' }}>
-                    {team.status === 'DISPATCHED' || team.status === 'ON SCENE' ? (
-                      <button
-                        type="button"
-                        aria-label={`Recall team ${team.id}`}
-                        onClick={() => recallRescueTeam(team.id)}
-                        style={{
-                          flex: 1,
-                          padding: '6px',
-                          background: 'rgba(239, 68, 68, 0.12)',
-                          color: '#EF4444',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
-                          borderRadius: '4px',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Recall Team
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        aria-label={`Dispatch team ${team.id} to emergency zone`}
-                        onClick={() => {
-                          const criticalAlert = floodAlerts.find(a => a.status === 'ACTIVE');
-                          dispatchRescueTeam(team.id, criticalAlert ? criticalAlert.zone : 'Critical Lowlands');
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: '6px',
-                          background: 'var(--gov-blue-700)',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: '4px',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Dispatch Now
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      aria-label={`Reassign team ${team.id}`}
-                      onClick={() => reassignRescueTeam(team.id, 'Ward 14 (Industrial Corridor)')}
-                      style={{
-                        flex: 1,
-                        padding: '6px',
-                        background: 'var(--bg-primary)',
-                        border: '1px solid var(--border-medium)',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        color: 'var(--text-primary)',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Reassign Zone
-                    </button>
-
-                    <button
-                      type="button"
-                      aria-label={`Add equipment to team ${team.id}`}
-                      onClick={() => addTeamEquipment(team.id, { personnel: 2, boats: 1 })}
-                      style={{
-                        padding: '6px 10px',
-                        background: 'var(--bg-primary)',
-                        border: '1px solid var(--border-medium)',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        color: 'var(--gov-blue-700)',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      + Equipment
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
           {/* =========================================================================
-              DRAWER 5: RELIEF CAMPS
+              DRAWER 5: RELIEF CAMPS OPERATING
              ========================================================================= */}
           {activeDrawer === 'camps' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  Designated high-ground relief centers &amp; supply stockpiles.
-                </span>
-
-                <button
-                  type="button"
-                  onClick={() => setIsCreatingNewCamp(!isCreatingNewCamp)}
-                  style={{
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    background: 'var(--gov-blue-700)',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <Plus size={12} />
-                  <span>New Shelter</span>
-                </button>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Government pre-evacuation centers and emergency shelters with live capacity and food/water provisions.
               </div>
 
-              {isCreatingNewCamp && (
-                <div style={{
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--gov-blue-700)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px'
-                }}>
-                  <strong style={{ fontSize: '12px' }}>Register New Emergency Shelter:</strong>
-                  <input
-                    type="text"
-                    placeholder="Shelter Name (e.g. St. Joseph Hall)"
-                    value={newCampName}
-                    onChange={(e) => setNewCampName(e.target.value)}
+              {reliefCamps.map(camp => {
+                const isActive = camp.status === 'ACTIVE';
+                const occupancyPct = Math.round(((camp.occupancy || 0) / (camp.capacity || 1)) * 100);
+
+                return (
+                  <div
+                    key={camp.id}
                     style={{
-                      padding: '6px 10px',
-                      background: 'var(--bg-primary)',
+                      background: 'var(--bg-secondary)',
                       border: '1px solid var(--border-medium)',
-                      borderRadius: '4px',
-                      color: 'var(--text-primary)',
-                      fontSize: '12px'
-                    }}
-                  />
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      placeholder="Ward / Area"
-                      value={newCampWard}
-                      onChange={(e) => setNewCampWard(e.target.value)}
-                      style={{
-                        flex: 1,
-                        padding: '6px 10px',
-                        background: 'var(--bg-primary)',
-                        border: '1px solid var(--border-medium)',
-                        borderRadius: '4px',
-                        color: 'var(--text-primary)',
-                        fontSize: '12px'
-                      }}
-                    />
-                    <input
-                      type="number"
-                      placeholder="Capacity"
-                      value={newCampCapacity}
-                      onChange={(e) => setNewCampCapacity(e.target.value)}
-                      style={{
-                        width: '90px',
-                        padding: '6px 10px',
-                        background: 'var(--bg-primary)',
-                        border: '1px solid var(--border-medium)',
-                        borderRadius: '4px',
-                        color: 'var(--text-primary)',
-                        fontSize: '12px'
-                      }}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleConfirmOpenCamp}
-                    style={{
-                      padding: '8px',
-                      borderRadius: '4px',
-                      background: '#10B981',
-                      border: 'none',
-                      color: '#FFFFFF',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      cursor: 'pointer'
+                      borderLeft: `5px solid ${isActive ? 'var(--water-cyan-600)' : '#94A3B8'}`,
+                      borderRadius: 'var(--radius-md)',
+                      padding: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px'
                     }}
                   >
-                    Confirm &amp; Open Shelter
-                  </button>
-                </div>
-              )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--text-primary)' }}>
+                          {camp.name}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {camp.ward}
+                        </div>
+                      </div>
 
-              {reliefCamps.map(camp => (
-                <div
-                  key={camp.id}
-                  style={{
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-light)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--text-primary)' }}>{camp.name}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Ward: {camp.ward}</div>
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        color: isActive ? 'var(--water-cyan-600)' : 'var(--text-muted)',
+                        background: isActive ? 'rgba(14, 165, 233, 0.12)' : 'var(--bg-tertiary)',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        textTransform: 'uppercase'
+                      }}>
+                        {camp.status}
+                      </span>
                     </div>
 
-                    <span style={{
-                      fontSize: '10px',
-                      fontWeight: 800,
-                      color: camp.status === 'ACTIVE' ? '#10B981' : '#F59E0B',
-                      background: camp.status === 'ACTIVE' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
-                      padding: '2px 8px',
+                    {/* Capacity & Occupancy with Progress Bar */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Shelter Occupancy:</span>
+                        <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>
+                          {camp.occupancy} / {camp.capacity} Citizens ({occupancyPct}%)
+                        </span>
+                      </div>
+                      <div style={{
+                        height: '8px',
+                        width: '100%',
+                        borderRadius: '4px',
+                        background: 'var(--bg-tertiary)',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${Math.min(100, occupancyPct)}%`,
+                          background: occupancyPct > 85 ? '#EF4444' : occupancyPct > 60 ? '#F59E0B' : 'var(--water-cyan-600)',
+                          borderRadius: '4px',
+                          transition: 'width 0.3s'
+                        }} />
+                      </div>
+                    </div>
+
+                    {/* Stock Logistics */}
+                    <div style={{
+                      display: 'flex',
+                      gap: '12px',
+                      fontSize: '11px',
+                      color: 'var(--text-secondary)',
+                      background: 'var(--bg-primary)',
+                      padding: '8px 10px',
                       borderRadius: '4px'
                     }}>
-                      {camp.status}
-                    </span>
-                  </div>
-
-                  {/* Occupancy bar */}
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Occupancy</span>
-                      <strong>{camp.occupancy} / {camp.capacity} Citizens ({Math.round((camp.occupancy / camp.capacity) * 100)}%)</strong>
+                      <div>Food Ration: <strong>{camp.foodDays} Days</strong></div>
+                      <div>Potable Water: <strong>{camp.waterDays} Days</strong></div>
+                      <div>Medical: <strong style={{ color: '#10B981' }}>{camp.medicalStatus}</strong></div>
                     </div>
-                    <div style={{ width: '100%', height: '6px', background: 'var(--bg-primary)', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div style={{ width: `${(camp.occupancy / camp.capacity) * 100}%`, height: '100%', background: 'var(--gov-blue-700)' }} />
-                    </div>
-                  </div>
 
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Rations: <strong>{camp.foodDays} Days</strong> &bull; Clean Water: <strong>{camp.waterDays} Days</strong> &bull; Medical: <strong>{camp.medicalStatus}</strong>
-                  </div>
-
-                  {/* Action buttons */}
-                  <div style={{ display: 'flex', gap: '6px', paddingTop: '6px', borderTop: '1px solid var(--border-light)' }}>
-                    {camp.status === 'ACTIVE' ? (
+                    {/* Controls Strip */}
+                    <div style={{
+                      display: 'flex',
+                      gap: '6px',
+                      paddingTop: '8px',
+                      borderTop: '1px solid var(--border-light)'
+                    }}>
                       <button
                         type="button"
-                        aria-label={`Close shelter ${camp.name}`}
-                        onClick={() => closeReliefCamp(camp.id)}
+                        onClick={() => updateCampOccupancy(camp.id, 50)}
+                        disabled={!isActive || camp.occupancy >= camp.capacity}
                         style={{
-                          padding: '5px 8px',
-                          background: 'rgba(239, 68, 68, 0.1)',
-                          color: '#EF4444',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          flex: 1,
+                          padding: '6px 8px',
                           borderRadius: '4px',
+                          background: 'var(--bg-primary)',
+                          border: '1px solid var(--border-medium)',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        +50 Evacuees
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => updateCampOccupancy(camp.id, -50)}
+                        disabled={!isActive || camp.occupancy <= 0}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          borderRadius: '4px',
+                          background: 'var(--bg-primary)',
+                          border: '1px solid var(--border-medium)',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        -50 Discharged
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => requestCampSupplies(camp.id, { food: 3, water: 2 })}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          borderRadius: '4px',
+                          background: 'rgba(14, 165, 233, 0.1)',
+                          color: 'var(--water-cyan-600)',
+                          border: '1px solid rgba(14, 165, 233, 0.3)',
                           fontSize: '11px',
                           fontWeight: 700,
                           cursor: 'pointer'
                         }}
                       >
-                        Close
+                        Dispatch Supplies
                       </button>
-                    ) : (
-                      <button
-                        type="button"
-                        aria-label={`Open shelter ${camp.name}`}
-                        onClick={() => openReliefCamp({ id: camp.id })}
-                        style={{
-                          padding: '5px 8px',
-                          background: '#10B981',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: '4px',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Activate
-                      </button>
-                    )}
 
-                    <button
-                      type="button"
-                      aria-label={`Add 50 citizens to ${camp.name}`}
-                      onClick={() => updateCampOccupancy(camp.id, 50)}
-                      style={{
-                        flex: 1,
-                        padding: '5px 8px',
-                        background: 'var(--bg-primary)',
-                        border: '1px solid var(--border-medium)',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        color: 'var(--text-primary)',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      +50 Evacuees
-                    </button>
-
-                    <button
-                      type="button"
-                      aria-label={`Reduce 50 citizens from ${camp.name}`}
-                      onClick={() => updateCampOccupancy(camp.id, -50)}
-                      disabled={camp.occupancy <= 0}
-                      style={{
-                        padding: '5px 8px',
-                        background: 'var(--bg-primary)',
-                        border: '1px solid var(--border-medium)',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        color: 'var(--text-secondary)',
-                        cursor: camp.occupancy <= 0 ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      -50
-                    </button>
-
-                    <button
-                      type="button"
-                      aria-label={`Request supplies for ${camp.name}`}
-                      onClick={() => requestCampSupplies(camp.id, { food: 3, water: 3 })}
-                      style={{
-                        padding: '5px 8px',
-                        background: 'var(--bg-primary)',
-                        border: '1px solid var(--border-medium)',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        color: 'var(--gov-blue-700)',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      + Supplies
-                    </button>
+                      {isActive ? (
+                        <button
+                          type="button"
+                          onClick={() => closeReliefCamp(camp.id)}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            background: 'transparent',
+                            color: 'var(--text-muted)',
+                            border: '1px solid var(--border-light)',
+                            fontSize: '11px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Close
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openReliefCamp({ id: camp.id })}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            background: 'var(--gov-blue-700)',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Activate
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -1039,265 +1350,50 @@ export default function OverviewCardDrawer({ onClose, onSwitchTab }) {
               DRAWER 6: GLOBAL ACTIVITY LOG
              ========================================================================= */}
           {activeDrawer === 'activity' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Auditable chronological event log of all disaster management commands and dispatches.
+                Auditable transaction journal recording team assignments, sensor failover events, broadcasts, and clearances.
               </div>
 
-              {activityLog.map(act => (
-                <div
-                  key={act.id}
-                  style={{
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-light)',
-                    borderRadius: 'var(--radius-sm)',
-                    padding: '10px 12px',
-                    fontSize: '11px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 800, color: 'var(--gov-blue-700)' }}>{act.action}</span>
-                    <span style={{ color: 'var(--text-muted)' }}>{act.timestamp}</span>
-                  </div>
-                  <div style={{ color: 'var(--text-primary)' }}>{act.details}</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '10px', marginTop: '2px' }}>
-                    <span>By: {act.actor}</span>
-                    <span style={{ color: '#3B82F6', fontWeight: 700 }}>{act.tag}</span>
-                  </div>
+              {activityLog.length === 0 ? (
+                <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  No activities recorded in current session.
                 </div>
-              ))}
+              ) : (
+                activityLog.map(item => (
+                  <div
+                    key={item.id}
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-light)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '12px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gov-blue-700)' }}>
+                        {item.action}
+                      </span>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                        {item.timestamp}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-primary)' }}>
+                      {item.details}
+                    </div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                      Logged by: {item.actor} &bull; <span style={{ color: '#3B82F6' }}>{item.tag}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
 
         </div>
-
-        {/* INLINE MODAL: DISPATCH RESCUE TEAM DIALOG */}
-        {selectedAlertForDispatch && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10001,
-            padding: '20px'
-          }}>
-            <div style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-medium)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '24px',
-              maxWidth: '460px',
-              width: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px'
-            }}>
-              <h4 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
-                Authorize Emergency Rescue Deployment
-              </h4>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Deploying rescue crew to: <strong>{selectedAlertForDispatch.zone}</strong>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
-                  Select Available Rescue Unit:
-                </label>
-                {availableTeams.length === 0 ? (
-                  <div style={{ fontSize: '12px', color: '#EF4444', background: 'rgba(239, 68, 68, 0.1)', padding: '8px', borderRadius: '4px' }}>
-                    ⚠️ No teams currently available in standby. Please recall an active team first.
-                  </div>
-                ) : (
-                  <select
-                    value={selectedTeamId}
-                    onChange={(e) => setSelectedTeamId(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 10px',
-                      background: 'var(--bg-secondary)',
-                      border: '1px solid var(--border-medium)',
-                      borderRadius: '4px',
-                      color: 'var(--text-primary)',
-                      fontSize: '12px'
-                    }}
-                  >
-                    <option value="">Select a team...</option>
-                    {availableTeams.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({t.personnel} Personnel, {t.boats} Boats) &bull; {t.zone}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
-                  Target Arrival ETA (Minutes):
-                </label>
-                <input
-                  type="number"
-                  min="5"
-                  max="45"
-                  value={dispatchEta}
-                  onChange={(e) => setDispatchEta(parseInt(e.target.value, 10) || 10)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-medium)',
-                    borderRadius: '4px',
-                    color: 'var(--text-primary)',
-                    fontSize: '12px'
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedAlertForDispatch(null)}
-                  style={{
-                    padding: '8px 14px',
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-medium)',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleConfirmTeamDispatch}
-                  disabled={!selectedTeamId}
-                  style={{
-                    padding: '8px 16px',
-                    background: selectedTeamId ? 'var(--gov-blue-700)' : 'var(--bg-tertiary)',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: selectedTeamId ? '#FFFFFF' : 'var(--text-muted)',
-                    cursor: selectedTeamId ? 'pointer' : 'not-allowed'
-                  }}
-                >
-                  Confirm Dispatch
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* INLINE MODAL: OPEN RELIEF SHELTER DIALOG */}
-        {selectedAlertForCamp && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10001,
-            padding: '20px'
-          }}>
-            <div style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-medium)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '24px',
-              maxWidth: '460px',
-              width: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px'
-            }}>
-              <h4 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
-                Activate Relief Shelter for Evacuees
-              </h4>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Target Catchment Zone: <strong>{selectedAlertForCamp.zone}</strong>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
-                  Select Existing Camp to Activate:
-                </label>
-                <select
-                  value={selectedCampToOpen}
-                  onChange={(e) => setSelectedCampToOpen(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-medium)',
-                    borderRadius: '4px',
-                    color: 'var(--text-primary)',
-                    fontSize: '12px'
-                  }}
-                >
-                  <option value="">Select a shelter...</option>
-                  {reliefCamps.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.ward}) &bull; Capacity: {c.capacity} [{c.status}]
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedAlertForCamp(null)}
-                  style={{
-                    padding: '8px 14px',
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-medium)',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleConfirmOpenCamp}
-                  disabled={!selectedCampToOpen}
-                  style={{
-                    padding: '8px 16px',
-                    background: selectedCampToOpen ? '#10B981' : 'var(--bg-tertiary)',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: selectedCampToOpen ? '#FFFFFF' : 'var(--text-muted)',
-                    cursor: selectedCampToOpen ? 'pointer' : 'not-allowed'
-                  }}
-                >
-                  Confirm &amp; Open
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
     </div>
   );

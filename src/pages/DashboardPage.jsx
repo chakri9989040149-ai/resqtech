@@ -63,16 +63,26 @@ export default function DashboardPage() {
     activityLog,
     toast,
     resetDemoData,
-    dispatchRescueTeam,
-    recallRescueTeam,
-    reassignRescueTeam,
-    cycleTeamStatus,
+    activeDrawer,
+    setActiveDrawer,
+    activeTabIntent,
+    setActiveTabIntent,
+    selectedMapNodeId,
+    setSelectedMapNodeId,
+    assignTeamToAlert,
+    assignWorkerToBlockage,
+    reassignUnit,
+    markTeamOnScene,
+    markAlertResolved,
+    markDrainCleared,
+    simulateSensorFailure,
+    restorePrimarySensor,
+    simulateBlockageSpike,
     openReliefCamp,
     closeReliefCamp,
     updateCampOccupancy,
     requestCampSupplies,
     dispatchInspectionCrew,
-    markDrainCleared,
     markDrainUnderMaintenance,
     requestDrainRecheck,
     toggleDrainMute,
@@ -87,8 +97,15 @@ export default function DashboardPage() {
   const [lastUpdated, setLastUpdated] = useState(() => new Date().toLocaleTimeString());
   const [filterStatus, setFilterStatus] = useState('ALL');
 
+  // Handle cross-tab navigation intent
+  useEffect(() => {
+    if (activeTabIntent) {
+      setActiveTab(activeTabIntent);
+      setActiveTabIntent(null);
+    }
+  }, [activeTabIntent, setActiveTabIntent]);
+
   // Interactive UI State for Overlays
-  const [activeDrawer, setActiveDrawer] = useState(null); // 'alerts' | 'blockages' | 'nodes' | 'teams' | 'camps' | 'activity'
   const [activeZoneModal, setActiveZoneModal] = useState(null);
   const [reassignTeamModal, setReassignTeamModal] = useState(null);
   const [selectedZoneTeam, setSelectedZoneTeam] = useState('');
@@ -372,7 +389,7 @@ export default function DashboardPage() {
             </div>
 
             <div style={{ color: 'var(--text-muted)' }}>
-              14 IoT Sensing Nodes &bull; Last synchronized: <strong>{lastUpdated}</strong>
+              {kpis.onlineNodesCount} / {kpis.totalNodesCount} IoT Sensing Nodes Online &bull; Last synchronized: <strong>{lastUpdated}</strong>
             </div>
           </div>
 
@@ -384,7 +401,16 @@ export default function DashboardPage() {
           }}>
             {/* KPI 1: Active Flood Alerts */}
             <button
+              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => setActiveDrawer('alerts')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setActiveDrawer('alerts');
+                }
+              }}
               style={{
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border-medium)',
@@ -409,17 +435,26 @@ export default function DashboardPage() {
                   [SIMULATED]
                 </span>
               </div>
-              <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--status-critical)', fontFamily: 'var(--font-mono)' }}>
-                {kpis.activeAlertsCount} Active
+              <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--status-critical)', fontFamily: 'var(--font-mono)' }}>
+                {kpis.activeAlertsCount}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                {floodAlerts.filter(a => a.status === 'ACTIVE').length} Inundation alerts &bull; Click to action &rarr;
+                {kpis.activeAlertsCount} Inundation alerts active &bull; Click to action &rarr;
               </div>
             </button>
 
             {/* KPI 2: Suspected Blockages */}
             <button
+              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => setActiveDrawer('blockages')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setActiveDrawer('blockages');
+                }
+              }}
               style={{
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border-medium)',
@@ -444,8 +479,8 @@ export default function DashboardPage() {
                   [SIMULATED]
                 </span>
               </div>
-              <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--status-warning)', fontFamily: 'var(--font-mono)' }}>
-                {kpis.blockagesCount} Blockages
+              <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--status-warning)', fontFamily: 'var(--font-mono)' }}>
+                {kpis.suspectedBlockagesCount}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                 Sediment &amp; silt restrictions &bull; Click to clear &rarr;
@@ -454,7 +489,16 @@ export default function DashboardPage() {
 
             {/* KPI 3: Drain Nodes Online */}
             <button
+              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => setActiveDrawer('nodes')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setActiveDrawer('nodes');
+                }
+              }}
               style={{
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border-medium)',
@@ -479,8 +523,8 @@ export default function DashboardPage() {
                   [SIMULATED]
                 </span>
               </div>
-              <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--gov-blue-700)', fontFamily: 'var(--font-mono)' }}>
-                {drainNodes.length} / {drainNodes.length}
+              <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--gov-blue-700)', fontFamily: 'var(--font-mono)' }}>
+                {kpis.onlineNodesCount} / {kpis.totalNodesCount}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--status-normal)', fontWeight: 600 }}>
                 100% telemetry online &bull; Click to inspect &rarr;
@@ -489,7 +533,16 @@ export default function DashboardPage() {
 
             {/* KPI 4: Rescue Teams Active */}
             <button
+              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => setActiveDrawer('teams')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setActiveDrawer('teams');
+                }
+              }}
               style={{
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border-medium)',
@@ -514,8 +567,8 @@ export default function DashboardPage() {
                   [SIMULATED]
                 </span>
               </div>
-              <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                {kpis.activeRescueTeamsCount} Teams
+              <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                {kpis.activeTeamsCount}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                 {rescueTeams.filter(t => t.status === 'ON SCENE').length} On Scene, {rescueTeams.filter(t => t.status === 'DISPATCHED').length} Dispatched &rarr;
@@ -524,7 +577,16 @@ export default function DashboardPage() {
 
             {/* KPI 5: Relief Camps Operating */}
             <button
+              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => setActiveDrawer('camps')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setActiveDrawer('camps');
+                }
+              }}
               style={{
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border-medium)',
@@ -549,11 +611,11 @@ export default function DashboardPage() {
                   [SIMULATED]
                 </span>
               </div>
-              <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--water-cyan-600)', fontFamily: 'var(--font-mono)' }}>
-                {kpis.activeReliefCampsCount} Shelters
+              <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--water-cyan-600)', fontFamily: 'var(--font-mono)' }}>
+                {kpis.activeCampsCount}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                {reliefCamps.reduce((acc, c) => acc + (c.occupancy || 0), 0)} / {reliefCamps.reduce((acc, c) => acc + (c.capacity || 0), 0)} Citizens &rarr;
+                {kpis.totalCampOccupancy} / {kpis.totalCampCapacity} Citizens sheltered &rarr;
               </div>
             </button>
           </div>
@@ -645,6 +707,66 @@ export default function DashboardPage() {
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Click any node on the map to inspect live water depth and blockage index</p>
               </div>
               <GisMiniMap maintenanceDrains={maintenanceData?.drains || []} />
+            </div>
+          </div>
+
+          {/* SECTION: LIVE ACTIVITY & DISPATCH JOURNAL */}
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-medium)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '18px 22px',
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Activity size={18} color="var(--gov-blue-700)" />
+                <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>Live Incident &amp; Activity Journal</h3>
+                <span style={{ fontSize: '9px', fontWeight: 800, color: '#3B82F6', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 6px', borderRadius: '3px' }}>
+                  [SIMULATED AUDIT]
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveDrawer('activity')}
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: 'var(--gov-blue-700)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                View Full Audit Log ({activityLog?.length || 0}) &rarr;
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px' }}>
+              {(activityLog || []).slice(0, 3).map(entry => (
+                <div
+                  key={entry.id}
+                  style={{
+                    background: 'var(--bg-secondary)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '10px 14px',
+                    border: '1px solid var(--border-light)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--gov-blue-700)' }}>{entry.action}</span>
+                    <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{entry.timestamp}</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-primary)' }}>{entry.details}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{entry.actor} &bull; <span style={{ color: '#3B82F6' }}>{entry.tag}</span></div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -837,6 +959,70 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
+                  {/* Dual-Sensor Telemetry Grid */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                    gap: '8px',
+                    background: 'var(--bg-primary)',
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-light)'
+                  }}>
+                    {/* Primary Sensor */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)' }}>PRIMARY SENSOR</span>
+                        <span style={{
+                          fontSize: '9px',
+                          fontWeight: 800,
+                          padding: '1px 5px',
+                          borderRadius: '3px',
+                          background: node.primarySensor?.status === 'FAILED' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                          color: node.primarySensor?.status === 'FAILED' ? '#EF4444' : '#10B981'
+                        }}>
+                          {node.primarySensor?.status || 'ACTIVE'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>
+                        {node.primarySensor?.name || 'Ultrasonic Stage Sensor'}
+                      </div>
+                      <div style={{ fontSize: '10px', color: node.primarySensor?.status === 'FAILED' ? '#EF4444' : 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                        Reading: {node.primarySensor?.reading || node.waterLevel}
+                      </div>
+                    </div>
+
+                    {/* Backup Sensor */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)' }}>BACKUP SENSOR</span>
+                        <span style={{
+                          fontSize: '9px',
+                          fontWeight: 800,
+                          padding: '1px 5px',
+                          borderRadius: '3px',
+                          background: node.sensorHealth === 'BACKUP_ACTIVE' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                          color: node.sensorHealth === 'BACKUP_ACTIVE' ? '#3B82F6' : 'var(--text-muted)'
+                        }}>
+                          {node.backupSensor?.status || 'STANDBY'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>
+                        {node.backupSensor?.name || 'Hydrostatic Pressure Transducer'}
+                      </div>
+                      <div style={{ fontSize: '10px', color: node.sensorHealth === 'BACKUP_ACTIVE' ? '#3B82F6' : 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                        {node.sensorHealth === 'BACKUP_ACTIVE' ? '⚡ Dual-Sensor Failover Active' : 'Hot-Spare Standby'}
+                      </div>
+                    </div>
+
+                    {/* Assigned Worker Info */}
+                    <div style={{ gridColumn: '1 / -1', paddingTop: '4px', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        Assigned Response Worker: <strong style={{ color: node.assignedWorker ? '#3B82F6' : '#F59E0B' }}>{node.assignedWorker || 'Unassigned — Desilting Pending'}</strong>
+                      </span>
+                    </div>
+                  </div>
+
                   {/* Plain language explanation */}
                   <div style={{ fontSize: '12px', lineHeight: 1.5, color: 'var(--text-secondary)' }}>
                     <strong>Diagnostic Reason:</strong> {node.reason}
@@ -854,8 +1040,45 @@ export default function DashboardPage() {
                     paddingTop: '8px',
                     borderTop: '1px solid var(--border-light)'
                   }}>
+                    {/* Failover Simulation Button */}
+                    {node.primarySensor?.status !== 'FAILED' ? (
+                      <button
+                        onClick={() => simulateSensorFailure(node.id)}
+                        style={{
+                          padding: '5px 10px',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: '#EF4444',
+                          cursor: 'pointer'
+                        }}
+                        aria-label={`Simulate primary sensor failure on ${node.id}`}
+                      >
+                        Simulate Primary Failure
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => restorePrimarySensor(node.id)}
+                        style={{
+                          padding: '5px 10px',
+                          background: 'rgba(16, 185, 129, 0.1)',
+                          border: '1px solid rgba(16, 185, 129, 0.3)',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: '#10B981',
+                          cursor: 'pointer'
+                        }}
+                        aria-label={`Restore primary sensor on ${node.id}`}
+                      >
+                        Restore Primary Sensor
+                      </button>
+                    )}
+
                     <button
-                      onClick={() => dispatchInspectionCrew(node.id)}
+                      onClick={() => assignWorkerToBlockage(node.id)}
                       style={{
                         padding: '5px 10px',
                         background: 'var(--bg-primary)',
@@ -866,15 +1089,15 @@ export default function DashboardPage() {
                         color: 'var(--text-primary)',
                         cursor: 'pointer'
                       }}
-                      aria-label={`Dispatch inspection crew to ${node.id}`}
+                      aria-label={`Dispatch or reassign cleaning crew for ${node.id}`}
                     >
-                      Dispatch Crew
+                      {node.assignedWorker ? 'Reassign Worker' : 'Dispatch Worker'}
                     </button>
 
                     <button
                       onClick={() => {
-                        markDrainUnderMaintenance(node.id);
-                        setActiveTab('maintenance');
+                        setSelectedMapNodeId(node.id);
+                        setActiveTab('overview');
                       }}
                       style={{
                         padding: '5px 10px',
@@ -883,12 +1106,12 @@ export default function DashboardPage() {
                         borderRadius: 'var(--radius-sm)',
                         fontSize: '11px',
                         fontWeight: 600,
-                        color: 'var(--text-primary)',
+                        color: 'var(--gov-blue-700)',
                         cursor: 'pointer'
                       }}
-                      aria-label={`Schedule clean-up for ${node.id}`}
+                      aria-label={`Highlight ${node.id} on GIS map`}
                     >
-                      Schedule Clean-up
+                      View on Map
                     </button>
 
                     <button
@@ -909,7 +1132,7 @@ export default function DashboardPage() {
                     </button>
 
                     <button
-                      onClick={() => triggerSendAlertForArea(node.location, () => setActiveTab('alerts'))}
+                      onClick={() => triggerSendAlertForArea(node.location, 'DANGER')}
                       style={{
                         padding: '5px 10px',
                         background: 'rgba(239, 68, 68, 0.1)',
