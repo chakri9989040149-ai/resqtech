@@ -1384,8 +1384,22 @@ export default function OverviewCardDrawer({ onClose, onSwitchTab }) {
                     <div style={{ fontSize: '12px', color: 'var(--text-primary)' }}>
                       {item.details}
                     </div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                      Logged by: {item.actor} &bull; <span style={{ color: '#3B82F6' }}>{item.tag}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--text-muted)' }}>
+                      {(item.isAgent || item.actor === 'Coordinator Agent') && (
+                        <span style={{
+                          background: 'rgba(124, 58, 237, 0.12)',
+                          color: '#7C3AED',
+                          border: '1px solid rgba(124, 58, 237, 0.3)',
+                          borderRadius: '4px',
+                          padding: '1px 6px',
+                          fontSize: '9px',
+                          fontWeight: 700,
+                          letterSpacing: '0.04em'
+                        }}>
+                          🤖 Agent
+                        </span>
+                      )}
+                      <span>Logged by: {item.actor} &bull; <span style={{ color: '#3B82F6' }}>{item.tag}</span></span>
                     </div>
                   </div>
                 ))

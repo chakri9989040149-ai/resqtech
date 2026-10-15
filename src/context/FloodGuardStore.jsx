@@ -748,21 +748,94 @@ export function FloodGuardProvider({ children }) {
     }, 4500);
   }, []);
 
-  const addActivity = useCallback((action, details) => {
-    const actorName = user?.name ? `${user.name} (${user.designation || 'Officer'})` : 'Officer (Disaster Cell)';
+  const addActivity = useCallback((action, details, customActor = null, customTag = null, isAgent = false) => {
+    const actorName = customActor || (user?.name ? `${user.name} (${user.designation || 'Officer'})` : 'Officer (Disaster Cell)');
+    const entryIsAgent = Boolean(isAgent || customActor === 'Coordinator Agent' || customTag === 'Agent');
     const newEntry = {
       id: `ACT-${Math.floor(1000 + Math.random() * 9000)}`,
       timestamp: new Date().toLocaleTimeString(),
       actor: actorName,
       action,
       details,
-      tag: '[SIMULATED]'
+      tag: customTag || '[SIMULATED]',
+      isAgent: entryIsAgent
     };
     setStore(prev => ({
       ...prev,
       activityLog: [newEntry, ...prev.activityLog].slice(0, 60)
     }));
   }, [user]);
+
+  // Demo: Simulate multiple simultaneous incidents (Blockage spike + Sensor failure + Flood alert)
+  const simulateMultipleIncidents = useCallback(() => {
+    setStore(prev => {
+      // 1. Spike blockage on NODE-C-08
+      const updatedDrains = prev.drainNodes.map(d => {
+        if (d.id === 'NODE-C-08') {
+          return {
+            ...d,
+            blockagePct: 89,
+            waterLevel: '2.92 m',
+            status: 'CRITICAL',
+            operationalStatus: 'BLOCKED',
+            reason: 'Simulated high silt sediment and stormwater debris trapping.',
+            action: 'Emergency vacuum desilter crew required.'
+          };
+        }
+        // 2. Simulate primary sensor fault on NODE-P-03
+        if (d.id === 'NODE-P-03') {
+          return {
+            ...d,
+            primarySensor: {
+              ...d.primarySensor,
+              status: 'FAILED',
+              reading: '0.00 m (NO SIGNAL)'
+            },
+            sensorHealth: 'PRIMARY_FAILED'
+          };
+        }
+        return d;
+      });
+
+      // 3. Flood alert in Ward 14 Industrial Corridor
+      const multiAlertId = `ALT-MULTI-${Date.now().toString().slice(-4)}`;
+      const newAlert = {
+        id: multiAlertId,
+        title: 'Critical Inundation Risk — Ward 14 Industrial Corridor',
+        location: 'Urban Culvert Line C-8',
+        zone: 'Ward 14 (Industrial Area)',
+        severity: 'CRITICAL',
+        waterLevel: '2.92 m',
+        threshold: '2.50 m',
+        rainfall: '48 mm/hr',
+        time: 'Just now',
+        timestamp: Date.now(),
+        status: 'NEW',
+        assignedTeamId: null,
+        assignedTeamName: null,
+        drainNodeId: 'NODE-C-08'
+      };
+
+      const newActivity = {
+        id: `ACT-${Math.floor(1000 + Math.random() * 9000)}`,
+        timestamp: new Date().toLocaleTimeString(),
+        actor: 'Simulation Engine',
+        action: 'MULTI_INCIDENTS_TRIGGERED',
+        details: 'Simulated 3 concurrent emergencies: Blockage spike on NODE-C-08 (89%), primary sensor fault on NODE-P-03, and critical flood alert in Ward 14.',
+        tag: '[SIMULATED]',
+        isAgent: false
+      };
+
+      showToast('Triggered multi-incident scenario: blockage (89%) + sensor fault + flood alert!');
+
+      return {
+        ...prev,
+        drainNodes: updatedDrains,
+        floodAlerts: [newAlert, ...prev.floodAlerts.filter(a => a.id !== multiAlertId)],
+        activityLog: [newActivity, ...prev.activityLog].slice(0, 60)
+      };
+    });
+  }, [showToast]);
 
   // Reset entire simulation to pristine default
   const resetDemoData = useCallback(() => {
@@ -1725,6 +1798,8 @@ export function FloodGuardProvider({ children }) {
     setSelectedMapNodeId,
     showToast,
     resetDemoData,
+    addActivity,
+    simulateMultipleIncidents,
 
     // Tab 1 & Tab 3: Alerts & Assignment
     assignTeamToAlert,

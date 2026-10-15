@@ -37,6 +37,7 @@ import { LoRaSimulationService, PACKET_SPEC } from '../services/loraSim';
 import MaintenanceModule from '../components/MaintenanceModule';
 import { MaintenanceSimulationService } from '../services/maintenanceSim';
 import FloodAlertCenter from '../components/FloodAlertCenter';
+import CoordinatorAgentPanel from '../components/CoordinatorAgentPanel';
 
 const SHIPMENT_PROOFS = [
   {
@@ -494,6 +495,9 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* SensaFlow Coordinator Agent Panel (Autonomous Rule-Based Multi-Tasking Engine) */}
+          <CoordinatorAgentPanel />
+
           {/* 5 Core Interactive KPI Cards */}
           <div style={{
             display: 'grid',
@@ -913,7 +917,23 @@ export default function DashboardPage() {
                     <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{entry.timestamp}</span>
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-primary)' }}>{entry.details}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{entry.actor} &bull; <span style={{ color: '#3B82F6' }}>{entry.tag}</span></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--text-muted)' }}>
+                    {(entry.isAgent || entry.actor === 'Coordinator Agent') && (
+                      <span style={{
+                        background: 'rgba(124, 58, 237, 0.12)',
+                        color: '#7C3AED',
+                        border: '1px solid rgba(124, 58, 237, 0.3)',
+                        borderRadius: '4px',
+                        padding: '1px 6px',
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        letterSpacing: '0.04em'
+                      }}>
+                        🤖 AGENT
+                      </span>
+                    )}
+                    <span>{entry.actor} &bull; <span style={{ color: '#3B82F6' }}>{entry.tag}</span></span>
+                  </div>
                 </div>
               ))}
             </div>
