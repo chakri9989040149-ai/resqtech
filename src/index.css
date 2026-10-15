@@ -1,0 +1,201 @@
+/* FloodGuard AI — Design System & Theme Architecture */
+:root {
+  /* LIGHT THEME (Mandatory Default) */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8FAFC;
+  --bg-tertiary: #F1F5F9;
+  --bg-card: #FFFFFF;
+  --bg-card-elevated: #FFFFFF;
+  --bg-glass: rgba(255, 255, 255, 0.85);
+
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --text-muted: #64748B;
+  --text-inverse: #FFFFFF;
+
+  --border-light: #E2E8F0;
+  --border-medium: #CBD5E1;
+  --border-focus: #2563EB;
+
+  --gov-blue-900: #1E3A8A;
+  --gov-blue-800: #1E40AF;
+  --gov-blue-700: #1D4ED8;
+  --gov-blue-600: #2563EB;
+  --gov-blue-500: #3B82F6;
+  --gov-blue-100: #DBEAFE;
+  --gov-blue-50: #EFF6FF;
+
+  --water-cyan-600: #0891B2;
+  --water-cyan-500: #06B6D4;
+  --water-cyan-400: #22D3EE;
+  --water-cyan-100: #CFFAFE;
+  --water-cyan-50: #ECFEFF;
+
+  --status-critical: #DC2626;
+  --status-critical-bg: #FEF2F2;
+  --status-critical-border: #FCA5A5;
+
+  --status-warning: #D97706;
+  --status-warning-bg: #FFFBEB;
+  --status-warning-border: #FCD34D;
+
+  --status-normal: #16A34A;
+  --status-normal-bg: #F0FDF4;
+  --status-normal-border: #86EFAC;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.08);
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* DARK THEME */
+[data-theme="dark"] {
+  --bg-primary: #070D1D;
+  --bg-secondary: #0D162B;
+  --bg-tertiary: #14213D;
+  --bg-card: #0F1A35;
+  --bg-card-elevated: #162447;
+  --bg-glass: rgba(15, 26, 53, 0.88);
+
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-inverse: #0F172A;
+
+  --border-light: #1E293B;
+  --border-medium: #334155;
+  --border-focus: #38BDF8;
+
+  --gov-blue-900: #DBEAFE;
+  --gov-blue-800: #93C5FD;
+  --gov-blue-700: #60A5FA;
+  --gov-blue-600: #3B82F6;
+  --gov-blue-500: #60A5FA;
+  --gov-blue-100: #1E293B;
+  --gov-blue-50: #172554;
+
+  --water-cyan-600: #22D3EE;
+  --water-cyan-500: #38BDF8;
+  --water-cyan-400: #67E8F9;
+  --water-cyan-100: #083344;
+  --water-cyan-50: #042F2E;
+
+  --status-critical: #F87171;
+  --status-critical-bg: #450A0A;
+  --status-critical-border: #7F1D1D;
+
+  --status-warning: #FBBF24;
+  --status-warning-bg: #451A03;
+  --status-warning-border: #78350F;
+
+  --status-normal: #4ADE80;
+  --status-normal-bg: #052E16;
+  --status-normal-border: #14532D;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
+  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.6);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  min-height: 100%;
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--transition-normal), color var(--transition-normal);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus styles for accessibility */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* Pulse keyframes for monitoring nodes */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(220, 38, 38, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
+}
+
+@keyframes pulse-green {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(22, 163, 74, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

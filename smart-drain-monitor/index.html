@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Drain Monitor — ESP32 Simulation Dashboard</title>
+  <meta name="description" content="Simulated ESP32-based drain water-level monitoring system with real-time hydraulic mass-balance physics, hysteresis alerts, and hardware safety cross-section.">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- =====================================================================
+       MANDATORY PERSISTENT SIMULATION BANNER
+       ===================================================================== -->
+  <div class="top-sim-banner" role="banner" id="sim-top-banner">
+    <span class="banner-icon" aria-hidden="true">⚠️</span>
+    <span>SIMULATED DATA — No real sensor is connected. Local browser simulation engine active.</span>
+  </div>
+
+  <!-- =====================================================================
+       HEADER: BRAND & HARDWARE STATUS STRIP
+       ===================================================================== -->
+  <header class="app-header">
+    <div class="brand-wrapper">
+      <div class="brand-icon-box" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          <path d="M2 12h20" opacity="0.3"/>
+        </svg>
+      </div>
+      <div class="brand-titles">
+        <h1>
+          Smart Drain Monitor
+          <span class="sim-badge">SIMULATED DATA</span>
+        </h1>
+        <p>ESP32 Ultrasonic Water-Level Telemetry & Hydraulic Mass-Balance Simulation</p>
+      </div>
+    </div>
+
+    <!-- Telemetry status chips -->
+    <div class="header-status-strip">
+      <div class="status-chip" id="sensor-chip" title="Simulated Ultrasonic Transducer Connection Status">
+        <span class="label">Sensor:</span>
+        <span class="value" id="sensor-text">
+          <span class="dot connected" id="sensor-dot"></span> CONNECTED
+        </span>
+      </div>
+
+      <div class="status-chip" id="controller-chip" title="ESP32 Microcontroller Edge Status">
+        <span class="label">Controller:</span>
+        <span class="value" id="controller-text">
+          <span class="dot online" id="controller-dot"></span> ONLINE
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       MAIN DASHBOARD
+       ===================================================================== -->
+  <main class="dashboard-container">
+
+    <!-- -------------------------------------------------------------------
+         ROW 1: PRIMARY METRICS & GAUGES
+         ------------------------------------------------------------------- -->
+    <section class="metrics-row" aria-label="Key Simulated Metrics">
+      
+      <!-- Card 1: Water Level (cm) -->
+      <div class="card metric-card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+            </svg>
+            Water Level
+          </h2>
+          <span class="sim-badge small">SIMULATED DATA</span>
+        </div>
+        <div class="metric-value-box">
+          <span id="val-level-cm" class="big-number">10.5</span>
+          <span class="unit">cm</span>
+        </div>
+        <div class="metric-subtext">
+          <span id="stale-indicator" class="stale-warning-tag" style="display: none;">
+            ⚠️ STALE (DISCONNECTED)
+          </span>
+          <span>Max Channel Depth: 60.0 cm</span>
+        </div>
+      </div>
+
+      <!-- Card 2: Percentage & Vertical Tank Gauge -->
+      <div class="card gauge-card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="9" y1="21" x2="9" y2="9"/>
+            </svg>
+            Tank Gauge
+          </h2>
+          <span class="sim-badge small">SIMULATED DATA</span>
+        </div>
+        <div class="tank-gauge-card-content">
+          <!-- Vertical Tank Gauge Graphic -->
+          <div class="tank-gauge" title="Vertical Tank Level Indicator (0 - 60cm)">
+            <div class="tank-threshold-line overflow" title="Overflow limit (60cm)"></div>
+            <div class="tank-threshold-line critical" title="Critical threshold (80% / 48cm)"></div>
+            <div class="tank-threshold-line warning" title="Warning threshold (50% / 30cm)"></div>
+            <div class="tank-water-fill" id="tank-water-fill" style="height: 17.5%;">
+              <div class="tank-water-surface"></div>
+            </div>
+          </div>
+          <div class="tank-gauge-info">
+            <div class="metric-value-box">
+              <span id="val-level-pct" class="big-number">17.5%</span>
+            </div>
+            <div class="metric-subtext">
+              <span>Channel capacity fill</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Alert Status Badge with Hysteresis -->
+      <div class="card alert-card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 22 20 2 20 12 2"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            Alert Status
+          </h2>
+          <span class="sim-badge small">SIMULATED DATA</span>
+        </div>
+        <div class="alert-display-box">
+          <div id="alert-badge" class="alert-badge-large badge-normal" role="status" aria-live="polite">
+            <span id="alert-badge-text">NORMAL</span>
+          </div>
+          <div id="alert-message" class="alert-desc-text">
+            Drain flowing normally
+          </div>
+          <div id="transmission-warning-note" class="transmission-warning" style="display: none;">
+            ⚠️ Alerts not being transmitted (ESP32 Offline)
+          </div>
+          <div class="metric-subtext">
+            <span>Hysteresis band: ±3% (1.8 cm) anti-flicker</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Last Reading & Clock -->
+      <div class="card clock-card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Last Reading
+          </h2>
+          <span class="sim-badge small">SIMULATED DATA</span>
+        </div>
+        <div class="metric-value-box" style="margin-top: 0.5rem;">
+          <span id="val-last-reading" class="big-number" style="font-size: 1.55rem; letter-spacing: -0.01em;">
+            --:--:-- • 10.5 cm
+          </span>
+        </div>
+        <div class="metric-subtext" style="margin-top: 0.85rem;">
+          <span>Engine tick: 1.0s interval</span>
+        </div>
+        <div class="metric-subtext">
+          <span>Sensor jitter: ±0.3 cm noise model</span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- -------------------------------------------------------------------
+         ROW 2: LIVE CHART & VISUAL HARDWARE CROSS-SECTION
+         ------------------------------------------------------------------- -->
+    <section class="mid-row">
+      
+      <!-- Live Line Chart -->
+      <div class="card chart-card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            Live Water Level Hydrograph (Last 60s)
+          </h2>
+          <span class="sim-badge small">SIMULATED DATA</span>
+        </div>
+        <div class="chart-canvas-container">
+          <canvas id="chart-canvas" aria-label="Simulated real-time line chart of drain water levels"></canvas>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-items">
+            <span class="legend-item"><span class="legend-color water"></span> Water Level</span>
+            <span class="legend-item"><span class="legend-color warn"></span> Warning (50% / 30cm)</span>
+            <span class="legend-item"><span class="legend-color crit"></span> Critical (80% / 48cm)</span>
+            <span class="legend-item"><span class="legend-color overflow"></span> Overflow (60cm)</span>
+          </div>
+          <span>Updated every 1s</span>
+        </div>
+      </div>
+
+      <!-- Hardware Cross-Section SVG Diagram -->
+      <div class="card cross-section-card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+              <polyline points="2 17 12 22 22 17"/>
+              <polyline points="2 12 12 17 22 12"/>
+            </svg>
+            Drain Cross-Section & Hardware Safety
+          </h2>
+          <span class="sim-badge small">SIMULATED DATA</span>
+        </div>
+        
+        <div class="diagram-viewport">
+          <svg viewBox="0 0 440 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Animated cross-section view of drain channel, obstruction, and mounted ESP32 enclosure">
+            <defs>
+              <linearGradient id="waterGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85"/>
+                <stop offset="100%" stop-color="#0284c7" stop-opacity="0.95"/>
+              </linearGradient>
+              <pattern id="concreteHatch" width="8" height="8" patternUnits="userSpaceOnUse">
+                <path d="M0 8 L8 0 M0 0 L8 8" stroke="#334155" stroke-width="0.8" opacity="0.3"/>
+              </pattern>
+            </defs>
+
+            <!-- Concrete Drainage Trench Outer Walls -->
+            <rect x="50" y="85" width="340" height="165" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+            <rect x="50" y="85" width="340" height="165" fill="url(#concreteHatch)"/>
+            
+            <!-- Channel Hollow (Interior Basin) -->
+            <!-- Channel top y=90 (overflow level), channel floor y=240, height=150px = 60cm -->
+            <rect x="70" y="90" width="300" height="150" fill="#0b111e"/>
+
+            <!-- Inflow Arrow (Left) -->
+            <path d="M 30 115 L 65 115" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrow)"/>
+            <text x="25" y="108" fill="#38bdf8" font-size="9" font-family="Inter" font-weight="600">INFLOW</text>
+
+            <!-- Outflow Arrow (Right) -->
+            <path d="M 370 230 L 415 230" stroke="#0ea5e9" stroke-width="2.5"/>
+            <text x="380" y="222" fill="#0ea5e9" font-size="9" font-family="Inter" font-weight="600">OUTFLOW</text>
+
+            <!-- Overflow Level Marker (60cm) -->
+            <line x1="68" y1="90" x2="372" y2="90" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,4"/>
+            <text x="75" y="84" fill="#f87171" font-size="8.5" font-family="Inter" font-weight="700">OVERFLOW LEVEL (60 cm / 100%)</text>
+
+            <!-- Warning Level Line (30cm / 50%) -->
+            <line x1="70" y1="165" x2="370" y2="165" stroke="#f59e0b" stroke-width="1" stroke-dasharray="2,3" opacity="0.6"/>
+
+            <!-- DYNAMIC WATER RECTANGLE (y & height updated dynamically) -->
+            <rect id="svg-water-rect" x="70" y="215" width="300" height="25" fill="url(#waterGrad)"/>
+            <line id="svg-water-surface-line" x1="70" y1="215" x2="370" y2="215" stroke="#38bdf8" stroke-width="2"/>
+
+            <!-- Water Level dynamic text badge -->
+            <rect x="75" y="198" width="55" height="16" rx="3" fill="rgba(15, 23, 42, 0.85)" stroke="#38bdf8" stroke-width="1"/>
+            <text id="svg-water-level-text" x="102" y="210" fill="#bae6fd" font-size="9.5" font-family="JetBrains Mono" font-weight="700" text-anchor="middle">10.5 cm</text>
+
+            <!-- DYNAMIC REMOVABLE OBSTRUCTION OBJECT (Silt / Debris near outlet) -->
+            <g id="svg-obstruction-group" style="display: none;">
+              <!-- Debris pile shape -->
+              <rect id="svg-debris-shape" x="345" y="200" width="25" height="40" rx="4" fill="#78350f" stroke="#b45309" stroke-width="1.5"/>
+              <!-- Debris texture/labels -->
+              <text x="357" y="225" fill="#fde68a" font-size="7.5" font-family="Inter" font-weight="800" text-anchor="middle">BLOCK</text>
+            </g>
+
+            <!-- ========================================================= -->
+            <!-- SEPARATE, SEALED ESP32 ENCLOSURE MOUNTED ABOVE CHANNEL    -->
+            <!-- ========================================================= -->
+            <g id="svg-esp32-enclosure">
+              <!-- Physical Mounting Struts (holding enclosure apart and above drain) -->
+              <line x1="145" y1="65" x2="145" y2="90" stroke="#64748b" stroke-width="3"/>
+              <line x1="275" y1="65" x2="275" y2="90" stroke="#64748b" stroke-width="3"/>
+
+              <!-- Air Gap Indicator -->
+              <text x="210" y="78" fill="#94a3b8" font-size="7.5" font-family="Inter" text-anchor="middle">AIR GAP / SEPARATION (NO WATER CONTACT)</text>
+
+              <!-- Sealed IP65 Enclosure Box (y: 18 to 62) -->
+              <rect x="135" y="16" width="150" height="46" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+              <!-- Gasket seal line -->
+              <rect x="139" y="20" width="142" height="38" rx="4" fill="none" stroke="#0ea5e9" stroke-width="0.75" stroke-dasharray="3,2"/>
+              
+              <!-- ESP32 Label -->
+              <text x="210" y="34" fill="#f8fafc" font-size="9.5" font-family="Inter" font-weight="800" text-anchor="middle">ESP32 Enclosure</text>
+              <text x="210" y="46" fill="#38bdf8" font-size="7.5" font-family="Inter" font-weight="600" text-anchor="middle">SEALED IP65 • MOUNTED ABOVE WATER</text>
+
+              <!-- Status LED on enclosure -->
+              <circle cx="152" cy="36" r="3.5" fill="#10b981"/>
+              
+              <!-- Ultrasonic Sensor on Underside Facing Downwards -->
+              <!-- Only sensor face exposed -->
+              <rect x="195" y="60" width="30" height="7" rx="1" fill="#475569" stroke="#94a3b8" stroke-width="1"/>
+              <!-- Dual transducers (TX/RX) -->
+              <circle cx="204" cy="65" r="3" fill="#cbd5e1"/>
+              <circle cx="216" cy="65" r="3" fill="#cbd5e1"/>
+
+              <!-- Animated Ultrasonic Sound Cone / Beams down to water surface -->
+              <g id="svg-ultrasonic-beams" opacity="0.85">
+                <line id="svg-beam-1" x1="210" y1="67" x2="190" y2="215" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3,3"/>
+                <line id="svg-beam-2" x1="210" y1="67" x2="210" y2="215" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4,2"/>
+                <line id="svg-beam-3" x1="210" y1="67" x2="230" y2="215" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3,3"/>
+              </g>
+            </g>
+          </svg>
+        </div>
+
+        <!-- Hardware Design Rule Note Callout -->
+        <div class="hardware-design-note">
+          <strong>Design Rule:</strong> Keep the water channel separate from the electronics. Water must never enter the ESP32 enclosure. Transducer face points downwards across an open air gap.
+        </div>
+      </div>
+
+    </section>
+
+    <!-- -------------------------------------------------------------------
+         ROW 3: SCENARIOS, MANUAL CONTROLS, PARAMETERS & FAULTS
+         ------------------------------------------------------------------- -->
+    <section class="controls-row">
+      
+      <!-- Scenarios & Manual Sliders -->
+      <div class="card controls-card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>
+            Simulation Scenarios & Hydraulics
+          </h2>
+          <span class="sim-badge small">SIMULATED DATA</span>
+        </div>
+
+        <!-- 5 Scenarios Grid -->
+        <div class="scenario-grid" role="group" aria-label="Simulation Scenarios">
+          <button type="button" class="btn-scenario active" data-scenario="normal" id="sc-normal">
+            <span class="sc-title">1. Normal Condition</span>
+            <span class="sc-desc">Light inflow, clear outlet. Water level stable (~10-15 cm).</span>
+          </button>
+
+          <button type="button" class="btn-scenario" data-scenario="heavy_rain" id="sc-heavy-rain">
+            <span class="sc-title">2. Heavy Rainfall</span>
+            <span class="sc-desc">Storm runoff (4.2 cm/s). Water head builds rapidly.</span>
+          </button>
+
+          <button type="button" class="btn-scenario" data-scenario="drainage_blockage" id="sc-blockage">
+            <span class="sc-title">3. Drainage Blockage</span>
+            <span class="sc-desc">Silt & debris obstruction reduces outlet discharge by 50%.</span>
+          </button>
+
+          <button type="button" class="btn-scenario" data-scenario="severe_blockage" id="sc-severe-blockage">
+            <span class="sc-title">4. Severe Blockage</span>
+            <span class="sc-desc">90% outlet blockage. Approaching critical overflow line!</span>
+          </button>
+
+          <button type="button" class="btn-scenario" data-scenario="combined" id="sc-combined">
+            <span class="sc-title">5. Combined Storm + Blockage</span>
+            <span class="sc-desc">Heavy storm rain (4.0 cm/s) + 55% partial blockage obstruction.</span>
+          </button>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: 1.1rem 0;">
+
+        <!-- Independent Controls -->
+        <div class="manual-controls-grid">
+          
+          <!-- Rain Preset Selector -->
+          <div class="control-group">
+            <div class="control-label-row">
+              <label>Rainfall Intensity (Inflow Rate):</label>
+              <span class="control-val-badge" id="val-rain-display">Active Inflow</span>
+            </div>
+            <div class="rain-preset-buttons">
+              <button type="button" class="btn-preset" data-rain="none">None (0.0)</button>
+              <button type="button" class="btn-preset active" data-rain="light">Light (1.2)</button>
+              <button type="button" class="btn-preset" data-rain="heavy">Heavy (4.2)</button>
+              <button type="button" class="btn-preset" data-rain="extreme">Extreme (6.8)</button>
+            </div>
+          </div>
+
+          <!-- Blockage Slider -->
+          <div class="control-group">
+            <div class="control-label-row">
+              <label for="slider-blockage">Outlet Blockage Obstruction (0 - 100%):</label>
+              <span class="control-val-badge" id="val-blockage-display">0%</span>
+            </div>
+            <input type="range" class="slider-styled" id="slider-blockage" min="0" max="100" value="0" step="1">
+          </div>
+
+          <!-- Action Buttons Strip -->
+          <div class="action-buttons-strip">
+            <button type="button" class="btn-action btn-clear-obstruction" id="btn-remove-obstruction">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+              Remove Obstruction
+            </button>
+
+            <button type="button" class="btn-action" id="btn-pause">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16"/>
+                <rect x="14" y="4" width="4" height="16"/>
+              </svg>
+              Pause
+            </button>
+
+            <button type="button" class="btn-action" id="btn-reset">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6"/>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+              </svg>
+              Reset Simulation
+            </button>
+          </div>
+
+          <!-- Hydraulic Parameters Snapshot -->
+          <div class="params-pill-grid">
+            <div class="param-pill">
+              <span class="p-name">Inflow (Rain)</span>
+              <span class="p-value" id="param-inflow">1.2 cm/s</span>
+            </div>
+            <div class="param-pill">
+              <span class="p-name">Outflow (Discharge)</span>
+              <span class="p-value" id="param-outflow">1.2 cm/s</span>
+            </div>
+            <div class="param-pill">
+              <span class="p-name">Net Rate</span>
+              <span class="p-value" id="param-net">0.0 cm/s</span>
+            </div>
+            <div class="param-pill">
+              <span class="p-name">Blockage</span>
+              <span class="p-value" id="param-blockage">0%</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Fault Injection & Event Log -->
+      <div class="card logs-and-faults-card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            Fault Injection & Telemetry
+          </h2>
+          <span class="sim-badge small">SIMULATED DATA</span>
+        </div>
+
+        <!-- Fault Switches -->
+        <div class="fault-grid">
+          
+          <div class="fault-switch-card">
+            <div class="fault-info">
+              <span class="fault-title">Simulate Sensor Disconnect</span>
+              <span class="fault-desc">Disconnects transducer; reading freezes as STALE.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="switch-sensor-fault">
+              <span class="slider-round"></span>
+            </label>
+          </div>
+
+          <div class="fault-switch-card">
+            <div class="fault-info">
+              <span class="fault-title">Simulate Controller Offline</span>
+              <span class="fault-desc">ESP32 edge goes offline; alerts not transmitted.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="switch-controller-fault">
+              <span class="slider-round"></span>
+            </label>
+          </div>
+
+        </div>
+
+        <!-- Event Log Component -->
+        <div class="event-log-card">
+          <div class="card-header" style="margin-top: 1rem; margin-bottom: 0.5rem;">
+            <span class="card-title" style="font-size: 0.85rem;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"/>
+                <line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="3.01" y2="6"/>
+                <line x1="3" y1="12" x2="3.01" y2="12"/>
+                <line x1="3" y1="18" x2="3.01" y2="18"/>
+              </svg>
+              Scrolling Event Log
+            </span>
+            <span class="sim-badge small">SIMULATED DATA</span>
+          </div>
+
+          <div class="log-scroll-area" id="log-scroll-area" role="log" aria-live="polite">
+            <!-- Dynamically populated log rows -->
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- =====================================================================
+       FOOTER
+       ===================================================================== -->
+  <footer class="app-footer">
+    <div>
+      <strong>Smart Drain Monitor</strong> — Local Browser Simulation Engine
+    </div>
+    <div class="footer-tags">
+      <span class="sim-badge small">SIMULATED DATA</span>
+      <span>ESP32 Telemetry Demo</span>
+      <span>Max Channel Depth: 60 cm</span>
+    </div>
+  </footer>
+
+  <!-- Scripts: Loaded in universal standalone order -->
+  <script src="simulation.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>
