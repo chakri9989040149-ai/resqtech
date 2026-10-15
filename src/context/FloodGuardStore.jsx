@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useAuth } from './AuthContext';
 
 const FloodGuardContext = createContext(null);
-const STORAGE_KEY = 'floodguard_master_store_v3';
+const STORAGE_KEY = 'floodguard_master_store_v4';
 
 // Initial Seeds with coordinates for Map and Dual-Sensor telemetry
 const INITIAL_DRAIN_NODES = [
@@ -23,6 +23,9 @@ const INITIAL_DRAIN_NODES = [
     action: 'Mobilize mechanical vacuum desilter crew immediately.',
     battery: 92,
     linkQuality: 'EXCELLENT',
+    commsStatus: 'ONLINE', // 'ONLINE' | 'LORA_FALLBACK' | 'OFFLINE'
+    rssiDbm: -72,
+    lastSeen: 'Just now',
     operationalStatus: 'BLOCKED',
     assignedWorker: 'Rapid Desilting Crew 1 (Ramesh K.)',
     assignedWorkerId: 'CREW-01',
@@ -59,6 +62,9 @@ const INITIAL_DRAIN_NODES = [
     action: 'Monitor crest progression; prepare secondary sluice gate opening.',
     battery: 88,
     linkQuality: 'GOOD',
+    commsStatus: 'ONLINE',
+    rssiDbm: -81,
+    lastSeen: '1m ago',
     operationalStatus: 'NORMAL',
     assignedWorker: null,
     assignedWorkerId: null,
@@ -95,6 +101,9 @@ const INITIAL_DRAIN_NODES = [
     action: 'Deploy emergency barrier if sump exceeds 2.2m.',
     battery: 95,
     linkQuality: 'EXCELLENT',
+    commsStatus: 'ONLINE',
+    rssiDbm: -68,
+    lastSeen: '2m ago',
     operationalStatus: 'BLOCKED',
     assignedWorker: null,
     assignedWorkerId: null,
@@ -131,6 +140,9 @@ const INITIAL_DRAIN_NODES = [
     action: 'Routine automated telemetry polling active.',
     battery: 97,
     linkQuality: 'EXCELLENT',
+    commsStatus: 'ONLINE',
+    rssiDbm: -70,
+    lastSeen: 'Just now',
     operationalStatus: 'NORMAL',
     assignedWorker: null,
     assignedWorkerId: null,
@@ -167,6 +179,9 @@ const INITIAL_DRAIN_NODES = [
     action: 'Schedule emergency mechanical dredging.',
     battery: 84,
     linkQuality: 'GOOD',
+    commsStatus: 'ONLINE',
+    rssiDbm: -84,
+    lastSeen: '3m ago',
     operationalStatus: 'BLOCKED',
     assignedWorker: null,
     assignedWorkerId: null,
@@ -203,6 +218,9 @@ const INITIAL_DRAIN_NODES = [
     action: 'Dispatch desilting equipment before evening downpour.',
     battery: 79,
     linkQuality: 'EXCELLENT',
+    commsStatus: 'ONLINE',
+    rssiDbm: -76,
+    lastSeen: '4m ago',
     operationalStatus: 'BLOCKED',
     assignedWorker: null,
     assignedWorkerId: null,
@@ -232,7 +250,7 @@ const INITIAL_FLOOD_ALERTS = [
     severity: 'CRITICAL',
     waterLevel: '3.42 m (88%)',
     rainfall: '48 mm/hr',
-    status: 'ASSIGNED',
+    status: 'ON SCENE', // 'NEW' | 'ASSIGNED' | 'ON SCENE' | 'RESOLVED'
     assignedTeamId: 'TEAM-01',
     assignedTeamName: 'Rescue Unit Alpha',
     assignedAt: '12m ago',
@@ -266,7 +284,7 @@ const INITIAL_FLOOD_ALERTS = [
     severity: 'WARNING',
     waterLevel: '1.94 m (52%)',
     rainfall: '38 mm/hr',
-    status: 'ACTIVE',
+    status: 'NEW',
     assignedTeamId: null,
     assignedTeamName: null,
     assignedAt: null,
@@ -292,7 +310,8 @@ const INITIAL_RESCUE_TEAMS = [
     etaMinutes: 0,
     target: 'River Basin Weir Gate (Ward 4)',
     assignedTargetId: 'ALT-FL-01',
-    assignedAt: '12m ago'
+    assignedAt: '12m ago',
+    workload: 1
   },
   {
     id: 'TEAM-02',
@@ -307,7 +326,8 @@ const INITIAL_RESCUE_TEAMS = [
     etaMinutes: 12,
     target: 'Urban Culvert Line C-8 (Ward 14)',
     assignedTargetId: 'ALT-FL-02',
-    assignedAt: '25m ago'
+    assignedAt: '25m ago',
+    workload: 1
   },
   {
     id: 'TEAM-03',
@@ -322,7 +342,8 @@ const INITIAL_RESCUE_TEAMS = [
     etaMinutes: null,
     target: null,
     assignedTargetId: null,
-    assignedAt: null
+    assignedAt: null,
+    workload: 0
   },
   {
     id: 'TEAM-04',
@@ -337,7 +358,8 @@ const INITIAL_RESCUE_TEAMS = [
     etaMinutes: null,
     target: null,
     assignedTargetId: null,
-    assignedAt: null
+    assignedAt: null,
+    workload: 0
   },
   {
     id: 'CREW-01',
@@ -353,7 +375,8 @@ const INITIAL_RESCUE_TEAMS = [
     etaMinutes: 15,
     target: 'Culvert Line C-8',
     assignedTargetId: 'NODE-C-08',
-    assignedAt: '18m ago'
+    assignedAt: '18m ago',
+    workload: 1
   },
   {
     id: 'CREW-02',
@@ -369,7 +392,8 @@ const INITIAL_RESCUE_TEAMS = [
     etaMinutes: null,
     target: null,
     assignedTargetId: null,
-    assignedAt: null
+    assignedAt: null,
+    workload: 0
   },
   {
     id: 'CREW-03',
@@ -385,7 +409,8 @@ const INITIAL_RESCUE_TEAMS = [
     etaMinutes: null,
     target: null,
     assignedTargetId: null,
-    assignedAt: null
+    assignedAt: null,
+    workload: 0
   }
 ];
 
@@ -422,6 +447,74 @@ const INITIAL_RELIEF_CAMPS = [
     waterDays: 5,
     medicalStatus: 'STANDBY',
     status: 'CLOSED'
+  }
+];
+
+const INITIAL_MAINTENANCE_TASKS = [
+  {
+    id: 'TASK-M-101',
+    drainId: 'NODE-C-08',
+    title: 'Emergency Mechanical Vacuum Silt Dredging',
+    location: 'Culvert Line C-8 (Ward 14)',
+    type: 'Mechanical Desilting',
+    priority: 'URGENT',
+    status: 'IN_PROGRESS', // 'OPEN' | 'IN_PROGRESS' | 'DONE'
+    assignedWorker: 'Rapid Desilting Crew 1 (Ramesh K.)',
+    assignedWorkerId: 'CREW-01',
+    dueDate: 'Today, 14:00',
+    preRainTag: true,
+    notes: 'Severe trash rack blockage (87%). Vacuum desilter deployed.'
+  },
+  {
+    id: 'TASK-M-102',
+    drainId: 'NODE-D-03',
+    title: 'Market Channel Trash Clearing & Sediment Removal',
+    location: 'Market Road Arterial Storm Drain (Ward 9)',
+    type: 'Sediment Clearing',
+    priority: 'HIGH',
+    status: 'OPEN',
+    assignedWorker: 'Unassigned',
+    assignedWorkerId: null,
+    dueDate: 'Tomorrow, 10:00',
+    preRainTag: true,
+    notes: 'Organic waste from market stalls constricting flow by 66%.'
+  },
+  {
+    id: 'TASK-M-103',
+    drainId: 'NODE-D-07',
+    title: 'Metro Viaduct Trench Trash Extraction',
+    location: 'Metro Rail Viaduct Trench (Ward 4)',
+    type: 'Trash Rack Clearing',
+    priority: 'HIGH',
+    status: 'OPEN',
+    assignedWorker: 'Unassigned',
+    assignedWorkerId: null,
+    dueDate: 'Tomorrow, 16:00',
+    preRainTag: false,
+    notes: 'Construction debris and runoff silting.'
+  }
+];
+
+const INITIAL_AWARENESS_CAMPAIGNS = [
+  {
+    id: 'CMP-01',
+    zone: 'Ward 4 (Riverside Lowlands)',
+    title: 'Pre-Monsoon Flood Evacuation & Floodplain Awareness',
+    scheduledDate: 'Tomorrow, 10:00 AM',
+    status: 'SCHEDULED', // 'SCHEDULED' | 'ACTIVE' | 'COMPLETED'
+    targetHouseholds: 1420,
+    linkedAlertId: 'ALT-FL-01',
+    channel: 'Loudspeaker Van & Door-to-Door SMS Leaflet'
+  },
+  {
+    id: 'CMP-02',
+    zone: 'Ward 14 (Industrial Basin)',
+    title: 'Culvert Trash Disposal Compliance & Drainage Maintenance Drive',
+    scheduledDate: 'Saturday, 09:30 AM',
+    status: 'SCHEDULED',
+    targetHouseholds: 2800,
+    linkedAlertId: 'ALT-FL-02',
+    channel: 'Industrial Association SMS Advisory & PA System'
   }
 ];
 
@@ -596,10 +689,14 @@ export function FloodGuardProvider({ children }) {
           drainNodes: parsed.drainNodes || INITIAL_DRAIN_NODES,
           rescueTeams: parsed.rescueTeams || INITIAL_RESCUE_TEAMS,
           reliefCamps: parsed.reliefCamps || INITIAL_RELIEF_CAMPS,
+          maintenanceTasks: parsed.maintenanceTasks || INITIAL_MAINTENANCE_TASKS,
+          scheduledCampaigns: parsed.scheduledCampaigns || INITIAL_AWARENESS_CAMPAIGNS,
           riskZones: parsed.riskZones || INITIAL_RISK_ZONES,
           broadcastHistory: parsed.broadcastHistory || INITIAL_BROADCAST_HISTORY,
           lastDispatchedBroadcast: parsed.lastDispatchedBroadcast || INITIAL_BROADCAST_HISTORY[0],
-          activityLog: parsed.activityLog || INITIAL_ACTIVITY_LOG
+          activityLog: parsed.activityLog || INITIAL_ACTIVITY_LOG,
+          isOutageActive: Boolean(parsed.isOutageActive),
+          loraQueue: parsed.loraQueue || []
         };
       }
     } catch {
@@ -610,10 +707,14 @@ export function FloodGuardProvider({ children }) {
       drainNodes: INITIAL_DRAIN_NODES,
       rescueTeams: INITIAL_RESCUE_TEAMS,
       reliefCamps: INITIAL_RELIEF_CAMPS,
+      maintenanceTasks: INITIAL_MAINTENANCE_TASKS,
+      scheduledCampaigns: INITIAL_AWARENESS_CAMPAIGNS,
       riskZones: INITIAL_RISK_ZONES,
       broadcastHistory: INITIAL_BROADCAST_HISTORY,
       lastDispatchedBroadcast: INITIAL_BROADCAST_HISTORY[0],
-      activityLog: INITIAL_ACTIVITY_LOG
+      activityLog: INITIAL_ACTIVITY_LOG,
+      isOutageActive: false,
+      loraQueue: []
     };
   });
 
@@ -658,7 +759,7 @@ export function FloodGuardProvider({ children }) {
     };
     setStore(prev => ({
       ...prev,
-      activityLog: [newEntry, ...prev.activityLog].slice(0, 50)
+      activityLog: [newEntry, ...prev.activityLog].slice(0, 60)
     }));
   }, [user]);
 
@@ -669,20 +770,24 @@ export function FloodGuardProvider({ children }) {
       drainNodes: INITIAL_DRAIN_NODES,
       rescueTeams: INITIAL_RESCUE_TEAMS,
       reliefCamps: INITIAL_RELIEF_CAMPS,
+      maintenanceTasks: INITIAL_MAINTENANCE_TASKS,
+      scheduledCampaigns: INITIAL_AWARENESS_CAMPAIGNS,
       riskZones: INITIAL_RISK_ZONES,
       broadcastHistory: INITIAL_BROADCAST_HISTORY,
       lastDispatchedBroadcast: INITIAL_BROADCAST_HISTORY[0],
-      activityLog: INITIAL_ACTIVITY_LOG
+      activityLog: INITIAL_ACTIVITY_LOG,
+      isOutageActive: false,
+      loraQueue: []
     });
     setSelectedMapNodeId('NODE-C-08');
     showToast('Simulation data reset to default factory state.');
   }, [showToast]);
 
   // =========================================================================
-  // ACTIONS: TEAM ASSIGNMENT & DISPATCH (PART 2)
+  // ACTIONS: TEAM ASSIGNMENT & DISPATCH (TABS 1, 3, 4)
   // =========================================================================
 
-  // Assign a Rescue Team to a Flood Alert (Automatic best match or manual)
+  // Assign a Rescue Team to a Flood Alert
   const assignTeamToAlert = useCallback((alertId, manualTeamId = null) => {
     setStore(prev => {
       const alert = prev.floodAlerts.find(a => a.id === alertId);
@@ -700,10 +805,6 @@ export function FloodGuardProvider({ children }) {
           return prev;
         }
       } else {
-        // Automatic best match:
-        // 1. Right team type: 'RESCUE'
-        // 2. Currently available/standby
-        // 3. Nearest matching zone
         const availableRescue = prev.rescueTeams.filter(t => 
           (t.type === 'RESCUE' || !t.type) && (t.status === 'AVAILABLE' || t.status === 'STANDBY')
         );
@@ -713,7 +814,6 @@ export function FloodGuardProvider({ children }) {
           return prev;
         }
 
-        // Zone match
         chosenTeam = availableRescue.find(t => alert.zone.toLowerCase().includes(t.zone.toLowerCase())) || availableRescue[0];
       }
 
@@ -727,7 +827,8 @@ export function FloodGuardProvider({ children }) {
             target: alert.title,
             assignedTargetId: alert.id,
             assignedAt: timestamp,
-            etaMinutes: t.etaMinutes || 12
+            etaMinutes: t.etaMinutes || 12,
+            workload: (t.workload || 0) + 1
           };
         }
         return t;
@@ -757,7 +858,7 @@ export function FloodGuardProvider({ children }) {
     });
   }, [addActivity, showToast]);
 
-  // Assign a Cleaning Crew to a Blocked Drain (Automatic best match or manual)
+  // Assign a Cleaning Crew to a Blocked Drain
   const assignWorkerToBlockage = useCallback((drainId, manualCrewId = null) => {
     setStore(prev => {
       const drain = prev.drainNodes.find(d => d.id === drainId);
@@ -775,10 +876,6 @@ export function FloodGuardProvider({ children }) {
           return prev;
         }
       } else {
-        // Automatic best match:
-        // 1. Right team type: 'CLEANING'
-        // 2. Currently available
-        // 3. Nearest matching zone
         const availableCrews = prev.rescueTeams.filter(t => 
           t.type === 'CLEANING' && (t.status === 'AVAILABLE' || t.status === 'STANDBY')
         );
@@ -802,7 +899,8 @@ export function FloodGuardProvider({ children }) {
             target: drain.location,
             assignedTargetId: drain.id,
             assignedAt: timestamp,
-            etaMinutes: 10
+            etaMinutes: 10,
+            workload: (t.workload || 0) + 1
           };
         }
         return t;
@@ -821,18 +919,47 @@ export function FloodGuardProvider({ children }) {
         return d;
       });
 
+      // Also ensure a maintenance task exists and is linked
+      const existingTask = prev.maintenanceTasks.find(t => t.drainId === drainId && t.status !== 'DONE');
+      let updatedTasks = prev.maintenanceTasks;
+      if (existingTask) {
+        updatedTasks = prev.maintenanceTasks.map(t => t.id === existingTask.id ? {
+          ...t,
+          status: 'IN_PROGRESS',
+          assignedWorker: workerLabel,
+          assignedWorkerId: chosenCrew.id
+        } : t);
+      } else {
+        const newTask = {
+          id: `TASK-M-${Math.floor(200 + Math.random() * 800)}`,
+          drainId,
+          title: `Emergency Desilting & Trash Clearing — ${drain.name}`,
+          location: drain.location,
+          type: 'Mechanical Desilting',
+          priority: 'URGENT',
+          status: 'IN_PROGRESS',
+          assignedWorker: workerLabel,
+          assignedWorkerId: chosenCrew.id,
+          dueDate: 'Today, within 2h',
+          preRainTag: true,
+          notes: `Auto-generated from blockage telemetry (${drain.blockagePct}%).`
+        };
+        updatedTasks = [newTask, ...prev.maintenanceTasks];
+      }
+
       addActivity('CLEANING_ASSIGNED', `Assigned ${workerLabel} to clear blockage on ${drain.id} (${drain.location}).`);
       showToast(`Assigned ${chosenCrew.name} to ${drain.name}!`);
 
       return {
         ...prev,
         rescueTeams: updatedTeams,
-        drainNodes: updatedDrains
+        drainNodes: updatedDrains,
+        maintenanceTasks: updatedTasks
       };
     });
   }, [addActivity, showToast]);
 
-  // Reassign Team or Crew to a different unit
+  // Reassign Team or Crew
   const reassignUnit = useCallback((targetId, newTeamId, type = 'ALERT') => {
     setStore(prev => {
       const newTeam = prev.rescueTeams.find(t => t.id === newTeamId);
@@ -851,12 +978,18 @@ export function FloodGuardProvider({ children }) {
         const alert = prev.floodAlerts.find(a => a.id === targetId);
         if (!alert) return prev;
 
-        // Free previous team
         const prevTeamId = alert.assignedTeamId;
 
         const updatedTeams = prev.rescueTeams.map(t => {
           if (t.id === prevTeamId) {
-            return { ...t, status: 'AVAILABLE', target: null, assignedTargetId: null, assignedAt: null };
+            return {
+              ...t,
+              status: 'AVAILABLE',
+              target: null,
+              assignedTargetId: null,
+              assignedAt: null,
+              workload: Math.max(0, (t.workload || 1) - 1)
+            };
           }
           if (t.id === newTeam.id) {
             return {
@@ -865,7 +998,8 @@ export function FloodGuardProvider({ children }) {
               target: alert.title,
               assignedTargetId: alert.id,
               assignedAt: timestamp,
-              etaMinutes: 10
+              etaMinutes: 10,
+              workload: (t.workload || 0) + 1
             };
           }
           return t;
@@ -893,7 +1027,6 @@ export function FloodGuardProvider({ children }) {
           floodAlerts: updatedAlerts
         };
       } else {
-        // Blockage / Drain
         const drain = prev.drainNodes.find(d => d.id === targetId);
         if (!drain) return prev;
 
@@ -901,7 +1034,14 @@ export function FloodGuardProvider({ children }) {
 
         const updatedTeams = prev.rescueTeams.map(t => {
           if (t.id === prevCrewId) {
-            return { ...t, status: 'AVAILABLE', target: null, assignedTargetId: null, assignedAt: null };
+            return {
+              ...t,
+              status: 'AVAILABLE',
+              target: null,
+              assignedTargetId: null,
+              assignedAt: null,
+              workload: Math.max(0, (t.workload || 1) - 1)
+            };
           }
           if (t.id === newTeam.id) {
             return {
@@ -910,7 +1050,8 @@ export function FloodGuardProvider({ children }) {
               target: drain.location,
               assignedTargetId: drain.id,
               assignedAt: timestamp,
-              etaMinutes: 10
+              etaMinutes: 10,
+              workload: (t.workload || 0) + 1
             };
           }
           return t;
@@ -930,39 +1071,58 @@ export function FloodGuardProvider({ children }) {
           return d;
         });
 
+        // Update maintenance tasks
+        const updatedTasks = prev.maintenanceTasks.map(task => 
+          task.drainId === targetId ? { ...task, assignedWorker: workerLabel, assignedWorkerId: newTeam.id } : task
+        );
+
         addActivity('CREW_REASSIGNED', `Reassigned drain ${targetId} cleaning to ${newTeam.name}.`);
         showToast(`Reassigned to ${newTeam.name}!`);
 
         return {
           ...prev,
           rescueTeams: updatedTeams,
-          drainNodes: updatedDrains
+          drainNodes: updatedDrains,
+          maintenanceTasks: updatedTasks
         };
       }
     });
   }, [addActivity, showToast]);
 
-  // Mark a Team or Crew as "ON SCENE"
-  const markTeamOnScene = useCallback((teamId) => {
+  // Mark Team or Alert as "ON SCENE"
+  const markTeamOnScene = useCallback((teamOrAlertId) => {
     setStore(prev => {
-      const team = prev.rescueTeams.find(t => t.id === teamId);
-      if (!team) return prev;
+      // Find team by team id OR alert id
+      const team = prev.rescueTeams.find(t => t.id === teamOrAlertId || t.assignedTargetId === teamOrAlertId);
+      const alert = prev.floodAlerts.find(a => a.id === teamOrAlertId || (team && a.assignedTeamId === team.id));
 
       const updatedTeams = prev.rescueTeams.map(t => {
-        if (t.id === teamId) {
+        if (t.id === team?.id) {
           return { ...t, status: 'ON SCENE', etaMinutes: 0 };
         }
         return t;
       });
 
-      addActivity('TEAM_ON_SCENE', `${team.name} arrived and is now ON SCENE at ${team.target || 'location'}.`);
-      showToast(`${team.name} is now ON SCENE!`);
+      const updatedAlerts = prev.floodAlerts.map(a => {
+        if (a.id === alert?.id) {
+          return { ...a, status: 'ON SCENE' };
+        }
+        return a;
+      });
 
-      return { ...prev, rescueTeams: updatedTeams };
+      const teamName = team ? team.name : 'Emergency Unit';
+      addActivity('TEAM_ON_SCENE', `${teamName} arrived and is now ON SCENE.`);
+      showToast(`${teamName} is now ON SCENE!`);
+
+      return {
+        ...prev,
+        rescueTeams: updatedTeams,
+        floodAlerts: updatedAlerts
+      };
     });
   }, [addActivity, showToast]);
 
-  // Mark an Alert as RESOLVED (Frees the assigned team)
+  // Mark Alert as RESOLVED
   const markAlertResolved = useCallback((alertId) => {
     setStore(prev => {
       const alert = prev.floodAlerts.find(a => a.id === alertId);
@@ -978,7 +1138,8 @@ export function FloodGuardProvider({ children }) {
             target: null,
             assignedTargetId: null,
             assignedAt: null,
-            etaMinutes: null
+            etaMinutes: null,
+            workload: Math.max(0, (t.workload || 1) - 1)
           };
         }
         return t;
@@ -986,7 +1147,7 @@ export function FloodGuardProvider({ children }) {
 
       const updatedAlerts = prev.floodAlerts.map(a => {
         if (a.id === alertId) {
-          return { ...a, status: 'RESOLVED', assignedTeamId: null, assignedTeamName: null };
+          return { ...a, status: 'RESOLVED' };
         }
         return a;
       });
@@ -1002,7 +1163,43 @@ export function FloodGuardProvider({ children }) {
     });
   }, [addActivity, showToast]);
 
-  // Mark a Blocked Drain as CLEARED (Frees assigned worker, drops blockage to nominal)
+  // Send Public Alert for Inundation Alert
+  const sendPublicAlertForInundation = useCallback((alertId) => {
+    setStore(prev => {
+      const alert = prev.floodAlerts.find(a => a.id === alertId);
+      if (!alert) return prev;
+
+      const updatedAlerts = prev.floodAlerts.map(a => a.id === alertId ? { ...a, citizenNotified: true } : a);
+
+      const msg = `FLOOD ${alert.severity}: Inundation active in ${alert.zone}. Water level at ${alert.waterLevel}. Move to safe higher ground. Helpline 1070.`;
+      const newHistoryEntry = {
+        id: `SIM-DISPATCH-${Math.floor(1000 + Math.random() * 9000)}`,
+        level: alert.severity === 'CRITICAL' ? 'DANGER' : 'WARNING',
+        area: alert.zone,
+        language: 'en',
+        encoding: 'GSM-7',
+        segments: 1,
+        message: msg,
+        sentAt: 'Just now',
+        timestamp: Date.now(),
+        recipients: 3770,
+        deliveryStatus: 'Delivered',
+        deliveryPct: 98.6,
+        isSimulated: true
+      };
+
+      addActivity('CITIZEN_BROADCAST', `Dispatched public alert broadcast for ${alert.zone} (3,770 residents queued).`);
+      showToast(`Public flood warning broadcast to ${alert.zone}!`);
+
+      return {
+        ...prev,
+        floodAlerts: updatedAlerts,
+        broadcastHistory: [newHistoryEntry, ...prev.broadcastHistory]
+      };
+    });
+  }, [addActivity, showToast]);
+
+  // Mark Drain Cleared (Clears blockage everywhere and frees worker)
   const markDrainCleared = useCallback((drainId) => {
     setStore(prev => {
       const drain = prev.drainNodes.find(d => d.id === drainId);
@@ -1018,7 +1215,8 @@ export function FloodGuardProvider({ children }) {
             target: null,
             assignedTargetId: null,
             assignedAt: null,
-            etaMinutes: null
+            etaMinutes: null,
+            workload: Math.max(0, (t.workload || 1) - 1)
           };
         }
         return t;
@@ -1039,6 +1237,14 @@ export function FloodGuardProvider({ children }) {
         return d;
       });
 
+      // Complete linked maintenance tasks
+      const updatedTasks = prev.maintenanceTasks.map(task => {
+        if (task.drainId === drainId) {
+          return { ...task, status: 'DONE' };
+        }
+        return task;
+      });
+
       // Also resolve any linked risk zone or flood alert
       const updatedZones = prev.riskZones.map(z => 
         z.id.includes(drainId.replace('NODE-', '')) ? { ...z, blockagePct: 4, isSecured: true } : z
@@ -1047,13 +1253,14 @@ export function FloodGuardProvider({ children }) {
         a.drainNodeId === drainId || a.zone.includes(drainId.replace('NODE-', '')) ? { ...a, status: 'RESOLVED' } : a
       );
 
-      addActivity('DRAIN_CLEARED', `Drain ${drainId} cleared. Blockage 4%. ${freedCrewName ? `${freedCrewName} is now AVAILABLE.` : ''}`);
-      showToast(`Drain ${drainId} cleared! ${freedCrewName ? `${freedCrewName} is now Available.` : ''}`);
+      addActivity('DRAIN_CLEARED', `Drain ${drainId} cleared. Blockage dropped to 4%. ${freedCrewName ? `${freedCrewName} is now AVAILABLE.` : ''}`);
+      showToast(`Drain ${drainId} cleared! Blockage dropped to 4%.`);
 
       return {
         ...prev,
         drainNodes: updatedDrains,
         rescueTeams: updatedTeams,
+        maintenanceTasks: updatedTasks,
         riskZones: updatedZones,
         floodAlerts: updatedAlerts
       };
@@ -1061,10 +1268,8 @@ export function FloodGuardProvider({ children }) {
   }, [addActivity, showToast]);
 
   // =========================================================================
-  // ACTIONS: DUAL-SENSOR FAILOVER (PART 3)
+  // ACTIONS: DUAL-SENSOR FAILOVER (TAB 2)
   // =========================================================================
-
-  // Simulate Primary Sensor Failure -> Backup Sensor Activates Automatically!
   const simulateSensorFailure = useCallback((drainId) => {
     setStore(prev => {
       const target = prev.drainNodes.find(d => d.id === drainId);
@@ -1092,15 +1297,14 @@ export function FloodGuardProvider({ children }) {
 
       addActivity(
         'DUAL_SENSOR_FAILOVER',
-        `Primary sensor on ${drainId} marked FAILED. Dual-sensor failover activated backup sensor automatically. Node stays ONLINE.`
+        `Backup sensor activated on ${drainId}. Primary ultrasonic sensor failed, node stays Online.`
       );
-      showToast(`Failover Triggered: Backup sensor on ${drainId} activated automatically! Node remains ONLINE.`);
+      showToast(`Backup sensor activated on ${drainId}! Node remains Online.`);
 
       return { ...prev, drainNodes: updatedDrains };
     });
   }, [addActivity, showToast]);
 
-  // Restore Primary Sensor
   const restorePrimarySensor = useCallback((drainId) => {
     setStore(prev => {
       const updatedDrains = prev.drainNodes.map(d => {
@@ -1129,8 +1333,7 @@ export function FloodGuardProvider({ children }) {
     });
   }, [addActivity, showToast]);
 
-  // Simulate Blockage Spike -> Automatically creates alert & auto-assigns cleaning worker!
-  const simulateBlockageSpike = useCallback((drainId, spikePct = 89) => {
+  const simulateBlockageSpike = useCallback((drainId, spikePct = 88) => {
     setStore(prev => {
       const drain = prev.drainNodes.find(d => d.id === drainId);
       if (!drain) return prev;
@@ -1170,13 +1373,14 @@ export function FloodGuardProvider({ children }) {
             target: drain.location,
             assignedTargetId: drain.id,
             assignedAt: timestamp,
-            etaMinutes: 10
+            etaMinutes: 10,
+            workload: (t.workload || 0) + 1
           };
         }
         return t;
       }) : prev.rescueTeams;
 
-      // Create or update flood alert
+      // Create new flood alert
       const newAlert = {
         id: `ALT-SPIKE-${Math.floor(100 + Math.random() * 900)}`,
         title: `Rapid Blockage Inundation Warning — ${drain.name}`,
@@ -1195,9 +1399,25 @@ export function FloodGuardProvider({ children }) {
         drainNodeId: drain.id
       };
 
+      // Create new maintenance task
+      const newTask = {
+        id: `TASK-M-${Math.floor(200 + Math.random() * 800)}`,
+        drainId: drain.id,
+        title: `Immediate Desilting — ${drain.name} (${spikePct}%)`,
+        location: drain.location,
+        type: 'Emergency Desilting',
+        priority: 'URGENT',
+        status: 'IN_PROGRESS',
+        assignedWorker: workerLabel,
+        assignedWorkerId: availableCrew?.id || null,
+        dueDate: 'Today, within 2h',
+        preRainTag: true,
+        notes: `High blockage spike (${spikePct}%) detected.`
+      };
+
       addActivity(
         'BLOCKAGE_AUTO_ACTION',
-        `Blockage spike (${spikePct}%) on ${drain.id}! Auto-generated flood alert and auto-assigned ${workerLabel}.`
+        `High blockage (${spikePct}%) on ${drain.id}! Created alert, maintenance task, and auto-assigned ${workerLabel}.`
       );
       showToast(`Blockage Spike: ${spikePct}% on ${drain.id}! Auto-assigned ${workerLabel}.`);
 
@@ -1205,249 +1425,257 @@ export function FloodGuardProvider({ children }) {
         ...prev,
         drainNodes: updatedDrains,
         rescueTeams: updatedTeams,
-        floodAlerts: [newAlert, ...prev.floodAlerts]
+        floodAlerts: [newAlert, ...prev.floodAlerts],
+        maintenanceTasks: [newTask, ...prev.maintenanceTasks]
       };
     });
   }, [addActivity, showToast]);
 
   // =========================================================================
-  // OTHER ACTIONS: ALERTS, CAMPS, LOGISTICS
+  // ACTIONS: SHELTERS & CHECK-IN/OUT (TAB 4)
   // =========================================================================
-  const acknowledgeAlert = useCallback((alertId) => {
-    setStore(prev => ({
-      ...prev,
-      floodAlerts: prev.floodAlerts.map(a => a.id === alertId ? { ...a, status: 'ACKNOWLEDGED' } : a)
-    }));
-    addActivity('ALERT_ACKNOWLEDGED', `Acknowledged flood alert ${alertId}`);
-    showToast(`Alert ${alertId} marked as Acknowledged.`);
-  }, [addActivity, showToast]);
-
-  const escalateAlert = useCallback((alertId) => {
-    setStore(prev => ({
-      ...prev,
-      floodAlerts: prev.floodAlerts.map(a => a.id === alertId ? { ...a, status: 'ESCALATED', severity: 'CRITICAL' } : a)
-    }));
-    addActivity('ALERT_ESCALATED', `Escalated flood alert ${alertId} to CRITICAL priority.`);
-    showToast(`Alert ${alertId} Escalated to State Command.`);
-  }, [addActivity, showToast]);
-
-  const openReliefCamp = useCallback((campData) => {
+  const checkInShelter = useCallback((campId, count = 50) => {
     setStore(prev => {
-      const exists = prev.reliefCamps.find(c => c.id === campData.id);
-      let updatedCamps;
-      if (exists) {
-        updatedCamps = prev.reliefCamps.map(c => c.id === campData.id ? { ...c, status: 'ACTIVE' } : c);
-      } else {
-        const newCamp = {
-          id: `CAMP-0${prev.reliefCamps.length + 1}`,
-          name: campData.name || 'New Municipal Relief Shelter',
-          ward: campData.ward || 'Ward 4 (Riverside)',
-          capacity: parseInt(campData.capacity, 10) || 600,
-          occupancy: 0,
-          foodDays: 5,
-          waterDays: 4,
-          medicalStatus: 'SUPPLIED',
-          status: 'ACTIVE'
-        };
-        updatedCamps = [...prev.reliefCamps, newCamp];
-      }
+      const camp = prev.reliefCamps.find(c => c.id === campId);
+      if (!camp) return prev;
+
+      const newOcc = Math.min(camp.capacity, camp.occupancy + count);
+      const updatedCamps = prev.reliefCamps.map(c => c.id === campId ? { ...c, occupancy: newOcc, status: 'ACTIVE' } : c);
+
+      addActivity('SHELTER_CHECKIN', `Checked in +${count} citizens to ${camp.name} (${newOcc}/${camp.capacity}).`);
+      showToast(`Checked in evacuees to ${camp.name} (${newOcc}/${camp.capacity})`);
+
       return { ...prev, reliefCamps: updatedCamps };
     });
-    addActivity('CAMP_ACTIVATED', `Activated relief shelter ${campData.name || campData.id}`);
-    showToast(`Relief shelter activated successfully.`);
   }, [addActivity, showToast]);
 
-  const closeReliefCamp = useCallback((campId) => {
-    setStore(prev => ({
-      ...prev,
-      reliefCamps: prev.reliefCamps.map(c => c.id === campId ? { ...c, status: 'CLOSED', occupancy: 0 } : c)
-    }));
-    addActivity('CAMP_CLOSED', `Deactivated relief shelter ${campId}.`);
-    showToast(`Relief shelter ${campId} closed.`);
-  }, [addActivity, showToast]);
-
-  const updateCampOccupancy = useCallback((campId, delta) => {
-    setStore(prev => ({
-      ...prev,
-      reliefCamps: prev.reliefCamps.map(c => {
-        if (c.id === campId) {
-          const nextOcc = Math.max(0, Math.min(c.capacity, c.occupancy + delta));
-          return { ...c, occupancy: nextOcc };
-        }
-        return c;
-      })
-    }));
-    addActivity('OCCUPANCY_UPDATED', `Updated occupancy at shelter ${campId} by ${delta > 0 ? `+${delta}` : delta}.`);
-    showToast(`Shelter occupancy updated.`);
-  }, [addActivity, showToast]);
-
-  const requestCampSupplies = useCallback((campId, { food = 2, water = 2 }) => {
-    setStore(prev => ({
-      ...prev,
-      reliefCamps: prev.reliefCamps.map(c => c.id === campId ? {
-        ...c,
-        foodDays: c.foodDays + food,
-        waterDays: c.waterDays + water
-      } : c)
-    }));
-    addActivity('SUPPLIES_REQUESTED', `Emergency replenishment allocated to shelter ${campId} (+${food}d food, +${water}d water).`);
-    showToast(`Emergency supplies dispatched to camp ${campId}.`);
-  }, [addActivity, showToast]);
-
-  const dispatchInspectionCrew = useCallback((drainId) => {
-    assignWorkerToBlockage(drainId);
-  }, [assignWorkerToBlockage]);
-
-  const markDrainUnderMaintenance = useCallback((drainId) => {
-    setStore(prev => ({
-      ...prev,
-      drainNodes: prev.drainNodes.map(d => d.id === drainId ? {
-        ...d,
-        operationalStatus: 'UNDER_MAINTENANCE',
-        action: 'Scheduled desilting works in progress.'
-      } : d)
-    }));
-    addActivity('MAINTENANCE_MARKED', `Flagged ${drainId} as Under Maintenance.`);
-    showToast(`${drainId} set to Under Maintenance.`);
-  }, [addActivity, showToast]);
-
-  const requestDrainRecheck = useCallback((drainId) => {
-    setStore(prev => ({
-      ...prev,
-      drainNodes: prev.drainNodes.map(d => d.id === drainId ? {
-        ...d,
-        lastReading: 'Just now'
-      } : d)
-    }));
-    addActivity('TELEMETRY_PING', `Requested immediate acoustic diagnostic ping for ${drainId}.`);
-    showToast(`Acoustic telemetry ping returned for ${drainId}.`);
-  }, [addActivity, showToast]);
-
-  const toggleDrainMute = useCallback((drainId) => {
-    setStore(prev => ({
-      ...prev,
-      drainNodes: prev.drainNodes.map(d => d.id === drainId ? {
-        ...d,
-        muted: !d.muted
-      } : d)
-    }));
-    showToast(`Sensor telemetry alerts toggled for ${drainId}.`);
-  }, [showToast]);
-
-  const stageTeamAtRiskZone = useCallback((zoneId, teamId) => {
-    setStore(prev => ({
-      ...prev,
-      riskZones: prev.riskZones.map(z => z.id === zoneId ? { ...z, stagedTeamId: teamId } : z),
-      rescueTeams: prev.rescueTeams.map(t => t.id === teamId ? { ...t, status: 'ON SCENE', target: zoneId } : t)
-    }));
-    addActivity('ZONE_STAGED', `Staged rescue team ${teamId} at critical flood zone ${zoneId}.`);
-    showToast(`Rescue team ${teamId} staged at zone.`);
-  }, [addActivity, showToast]);
-
-  const openCampForRiskZone = useCallback((zoneId, campId) => {
-    setStore(prev => ({
-      ...prev,
-      riskZones: prev.riskZones.map(z => z.id === zoneId ? { ...z, openedCampId: campId } : z),
-      reliefCamps: prev.reliefCamps.map(c => c.id === campId ? { ...c, status: 'ACTIVE' } : c)
-    }));
-    addActivity('ZONE_EVACUATION', `Activated pre-evacuation shelter ${campId} for zone ${zoneId}.`);
-    showToast(`Pre-evacuation shelter ${campId} opened.`);
-  }, [addActivity, showToast]);
-
-  const markZoneSecured = useCallback((zoneId) => {
-    setStore(prev => ({
-      ...prev,
-      riskZones: prev.riskZones.map(z => z.id === zoneId ? { ...z, isSecured: true, blockagePct: 8 } : z)
-    }));
-    addActivity('ZONE_SECURED', `Flood barrier deployed & drainage channel secured for ${zoneId}.`);
-    showToast(`Zone marked as Secured.`);
-  }, [addActivity, showToast]);
-
-  const dispatchCitizenBroadcast = useCallback((payload) => {
-    const transactionId = `SIM-DISPATCH-${Math.floor(1000 + Math.random() * 9000)}`;
-    const deliveryRate = (97.5 + Math.random() * 2.3).toFixed(1);
-
-    const newHistoryEntry = {
-      id: transactionId,
-      level: payload.level,
-      area: payload.area,
-      language: payload.language,
-      encoding: payload.encoding || 'GSM-7',
-      segments: payload.segments || 1,
-      message: payload.message,
-      sentAt: 'Just now',
-      timestamp: Date.now(),
-      recipients: payload.recipients || 3770,
-      deliveryStatus: 'Delivered',
-      deliveryPct: parseFloat(deliveryRate),
-      isSimulated: true,
-      channels: {
-        sms: 'Delivered',
-        whatsapp: 'Delivered',
-        publicFeed: 'Published',
-        siren: payload.level === 'DANGER' ? 'Siren Active' : 'Advisory Chime'
-      }
-    };
-
+  const checkOutShelter = useCallback((campId, count = 50) => {
     setStore(prev => {
-      const updatedAlerts = prev.floodAlerts.map(a => {
-        if (payload.area.includes(a.zone) || a.zone.includes(payload.area)) {
-          return {
-            ...a,
-            citizenNotified: true,
-            status: payload.level === 'ALL_CLEAR' ? 'RESOLVED' : 'ACTIVE'
-          };
-        }
-        return a;
-      });
+      const camp = prev.reliefCamps.find(c => c.id === campId);
+      if (!camp) return prev;
 
-      const updatedZones = prev.riskZones.map(z => {
-        if (payload.area.includes(z.name) || z.name.includes(payload.area)) {
-          return { ...z, alertSent: true };
-        }
-        return z;
-      });
+      const newOcc = Math.max(0, camp.occupancy - count);
+      const updatedCamps = prev.reliefCamps.map(c => c.id === campId ? { ...c, occupancy: newOcc } : c);
+
+      addActivity('SHELTER_CHECKOUT', `Discharged/checked out -${count} citizens from ${camp.name} (${newOcc}/${camp.capacity}).`);
+      showToast(`Checked out evacuees from ${camp.name} (${newOcc}/${camp.capacity})`);
+
+      return { ...prev, reliefCamps: updatedCamps };
+    });
+  }, [addActivity, showToast]);
+
+  const scheduleAwarenessCampaign = useCallback((campaignData) => {
+    setStore(prev => {
+      const newCampaign = {
+        id: `CMP-0${prev.scheduledCampaigns.length + 1}`,
+        zone: campaignData.zone || 'Ward 4 (Riverside)',
+        title: campaignData.title || 'Pre-Flood Citizen Readiness & Evacuation Drive',
+        scheduledDate: campaignData.scheduledDate || 'Tomorrow, 10:00 AM',
+        status: 'SCHEDULED',
+        targetHouseholds: parseInt(campaignData.targetHouseholds, 10) || 1200,
+        linkedAlertId: campaignData.linkedAlertId || null,
+        channel: campaignData.channel || 'Mobile PA Vans & SMS Advisories'
+      };
+
+      addActivity('CAMPAIGN_SCHEDULED', `Scheduled preventive awareness campaign in ${newCampaign.zone}: "${newCampaign.title}".`);
+      showToast(`Awareness campaign scheduled for ${newCampaign.zone}!`);
 
       return {
         ...prev,
-        broadcastHistory: [newHistoryEntry, ...prev.broadcastHistory],
-        lastDispatchedBroadcast: newHistoryEntry,
-        floodAlerts: updatedAlerts,
-        riskZones: updatedZones
+        scheduledCampaigns: [newCampaign, ...prev.scheduledCampaigns]
       };
     });
-
-    addActivity(
-      'CITIZEN_BROADCAST',
-      `Dispatched ${payload.level} alert to ${payload.recipients?.toLocaleString() || 3770} citizens in ${payload.area}.`
-    );
-    showToast(`Broadcast dispatched! ${payload.recipients?.toLocaleString() || 3770} citizens queued.`);
-
-    return newHistoryEntry;
   }, [addActivity, showToast]);
 
-  const clearBroadcastHistory = useCallback(() => {
-    setStore(prev => ({
-      ...prev,
-      broadcastHistory: []
-    }));
-    addActivity('HISTORY_CLEARED', 'Cleared simulated broadcast logs.');
-    showToast('Broadcast history cleared.');
-  }, [addActivity, showToast]);
+  // =========================================================================
+  // ACTIONS: OFFLINE & LoRa TELEMETRY (TAB 5)
+  // =========================================================================
+  const toggleNetworkOutage = useCallback(() => {
+    setStore(prev => {
+      const nextOutage = !prev.isOutageActive;
+      const updatedDrains = prev.drainNodes.map(d => ({
+        ...d,
+        commsStatus: nextOutage ? 'LORA_FALLBACK' : 'ONLINE',
+        linkQuality: nextOutage ? 'LORA_ACTIVE' : 'EXCELLENT',
+        rssiDbm: nextOutage ? -92 : -72
+      }));
 
-  const triggerSendAlertForArea = useCallback((areaName, defaultLevel = 'DANGER') => {
-    setAlertPrefillParams({
-      area: areaName,
-      level: defaultLevel
+      addActivity(
+        'NETWORK_COMMS_EVENT',
+        nextOutage
+          ? 'SIMULATED CELLULAR OUTAGE: All 6 IoT nodes switched to LoRa fallback comms.'
+          : 'CELLULAR RESTORED: All 6 nodes reconnected to primary cellular telemetry bus.'
+      );
+      showToast(
+        nextOutage
+          ? 'Network Outage Active: Nodes switched to LoRa fallback.'
+          : 'Network Restored: Nodes returned to online cellular feed.'
+      );
+
+      return {
+        ...prev,
+        isOutageActive: nextOutage,
+        drainNodes: updatedDrains
+      };
     });
-    setActiveTabIntent('alerts');
-  }, []);
+  }, [addActivity, showToast]);
+
+  const queueLoRaAlert = useCallback((alertPayload) => {
+    setStore(prev => {
+      const queuedItem = {
+        id: `LORA-MSG-${Date.now()}`,
+        timestamp: new Date().toLocaleTimeString(),
+        payload: alertPayload,
+        status: 'SENT_VIA_LORA'
+      };
+
+      addActivity('LORA_PACKET_QUEUED', `Alert dispatched via sub-GHz LoRa radio fallback for ${alertPayload.zone || 'drain node'}.`);
+      showToast('Dispatched alert via LoRa fallback radio link!');
+
+      return {
+        ...prev,
+        loraQueue: [queuedItem, ...prev.loraQueue]
+      };
+    });
+  }, [addActivity, showToast]);
+
+  // =========================================================================
+  // ACTIONS: MAINTENANCE TASKS (TAB 6)
+  // =========================================================================
+  const createMaintenanceTask = useCallback((taskData) => {
+    if (!taskData.location || !taskData.title) {
+      showToast('Please provide a location and task title.', 'error');
+      return false;
+    }
+
+    setStore(prev => {
+      const newTask = {
+        id: `TASK-M-${Math.floor(300 + Math.random() * 700)}`,
+        drainId: taskData.drainId || null,
+        title: taskData.title,
+        location: taskData.location,
+        type: taskData.type || 'Mechanical Desilting',
+        priority: taskData.priority || 'MEDIUM',
+        status: 'OPEN',
+        assignedWorker: taskData.assignedWorker || 'Unassigned',
+        assignedWorkerId: taskData.assignedWorkerId || null,
+        dueDate: taskData.dueDate || 'Tomorrow, 12:00',
+        preRainTag: Boolean(taskData.preRainTag),
+        notes: taskData.notes || 'Routine upkeep.'
+      };
+
+      addActivity('MAINTENANCE_CREATED', `Created upkeep task: "${newTask.title}" for ${newTask.location}.`);
+      showToast(`Maintenance task created: ${newTask.title}`);
+
+      return {
+        ...prev,
+        maintenanceTasks: [newTask, ...prev.maintenanceTasks]
+      };
+    });
+    return true;
+  }, [addActivity, showToast]);
+
+  const completeMaintenanceTask = useCallback((taskId) => {
+    setStore(prev => {
+      const task = prev.maintenanceTasks.find(t => t.id === taskId);
+      if (!task) return prev;
+
+      // Update task status
+      const updatedTasks = prev.maintenanceTasks.map(t => t.id === taskId ? { ...t, status: 'DONE' } : t);
+
+      // If linked to a drain, clear the drain obstruction as well
+      let updatedDrains = prev.drainNodes;
+      let updatedTeams = prev.rescueTeams;
+      let updatedZones = prev.riskZones;
+      let updatedAlerts = prev.floodAlerts;
+
+      if (task.drainId) {
+        updatedDrains = prev.drainNodes.map(d => d.id === task.drainId ? {
+          ...d,
+          blockagePct: 4,
+          status: 'NORMAL',
+          operationalStatus: 'CLEARED',
+          assignedWorker: null,
+          assignedWorkerId: null,
+          action: 'Culvert cleared; nominal stormwater discharge restored.'
+        } : d);
+
+        // Free the worker
+        updatedTeams = prev.rescueTeams.map(t => {
+          if (t.assignedTargetId === task.drainId || t.id === task.assignedWorkerId) {
+            return {
+              ...t,
+              status: 'AVAILABLE',
+              target: null,
+              assignedTargetId: null,
+              assignedAt: null,
+              workload: Math.max(0, (t.workload || 1) - 1)
+            };
+          }
+          return t;
+        });
+
+        // Resolve risk zones and alerts
+        updatedZones = prev.riskZones.map(z => 
+          z.id.includes(task.drainId.replace('NODE-', '')) ? { ...z, blockagePct: 4, isSecured: true } : z
+        );
+        updatedAlerts = prev.floodAlerts.map(a => 
+          a.drainNodeId === task.drainId || a.zone.includes(task.drainId.replace('NODE-', '')) ? { ...a, status: 'RESOLVED' } : a
+        );
+      }
+
+      addActivity('TASK_COMPLETED', `Completed maintenance task ${taskId} (${task.title}). Obstruction cleared & worker released.`);
+      showToast(`Task ${taskId} marked Done! Blockage cleared.`);
+
+      return {
+        ...prev,
+        maintenanceTasks: updatedTasks,
+        drainNodes: updatedDrains,
+        rescueTeams: updatedTeams,
+        riskZones: updatedZones,
+        floodAlerts: updatedAlerts
+      };
+    });
+  }, [addActivity, showToast]);
+
+  const reassignMaintenanceWorker = useCallback((taskId, newWorkerName, newWorkerId = null) => {
+    setStore(prev => {
+      const task = prev.maintenanceTasks.find(t => t.id === taskId);
+      if (!task) return prev;
+
+      const updatedTasks = prev.maintenanceTasks.map(t => t.id === taskId ? {
+        ...t,
+        assignedWorker: newWorkerName,
+        assignedWorkerId: newWorkerId,
+        status: 'IN_PROGRESS'
+      } : t);
+
+      // If linked to drain, also update drain node
+      let updatedDrains = prev.drainNodes;
+      if (task.drainId) {
+        updatedDrains = prev.drainNodes.map(d => d.id === task.drainId ? {
+          ...d,
+          assignedWorker: newWorkerName,
+          assignedWorkerId: newWorkerId
+        } : d);
+      }
+
+      addActivity('MAINTENANCE_REASSIGNED', `Reassigned task ${taskId} to ${newWorkerName}.`);
+      showToast(`Task ${taskId} assigned to ${newWorkerName}`);
+
+      return {
+        ...prev,
+        maintenanceTasks: updatedTasks,
+        drainNodes: updatedDrains
+      };
+    });
+  }, [addActivity, showToast]);
 
   // Compute live KPI aggregates from one unified source of truth
   const kpis = useMemo(() => {
-    const activeAlertsCount = store.floodAlerts.filter(a => a.status === 'ACTIVE' || a.status === 'ESCALATED' || a.status === 'ASSIGNED').length;
+    const activeAlertsCount = store.floodAlerts.filter(a => a.status === 'NEW' || a.status === 'ACTIVE' || a.status === 'ESCALATED' || a.status === 'ASSIGNED' || a.status === 'ON SCENE').length;
     const suspectedBlockagesCount = store.drainNodes.filter(d => d.blockagePct >= 25 && d.operationalStatus !== 'CLEARED').length;
-    const onlineNodesCount = store.drainNodes.filter(d => d.operationalStatus !== 'OFFLINE').length;
+    const onlineNodesCount = store.drainNodes.filter(d => d.operationalStatus !== 'OFFLINE' && d.commsStatus !== 'OFFLINE').length;
     const totalNodesCount = store.drainNodes.length;
     const activeTeamsCount = store.rescueTeams.filter(t => t.status === 'DISPATCHED' || t.status === 'ON SCENE').length;
     const totalTeamsCount = store.rescueTeams.length;
@@ -1468,43 +1696,20 @@ export function FloodGuardProvider({ children }) {
     };
   }, [store]);
 
-  const recallRescueTeam = useCallback((teamId) => {
-    setStore(prev => ({
-      ...prev,
-      rescueTeams: prev.rescueTeams.map(t => t.id === teamId ? { ...t, status: 'AVAILABLE', etaMinutes: null, target: null, assignedTargetId: null } : t)
-    }));
-    addActivity('RESCUE_RECALLED', `Recalled team ${teamId} to standby depot.`);
-    showToast(`Team ${teamId} recalled to base.`);
-  }, [addActivity, showToast]);
-
-  const cycleTeamStatus = useCallback((teamId, newStatus) => {
-    setStore(prev => ({
-      ...prev,
-      rescueTeams: prev.rescueTeams.map(t => t.id === teamId ? { ...t, status: newStatus } : t)
-    }));
-    addActivity('TEAM_STATUS_UPDATE', `Updated team ${teamId} status to ${newStatus}.`);
-    showToast(`Team ${teamId} set to ${newStatus}.`);
-  }, [addActivity, showToast]);
-
-  const reassignRescueTeam = useCallback((teamId, newZone) => {
-    setStore(prev => ({
-      ...prev,
-      rescueTeams: prev.rescueTeams.map(t => t.id === teamId ? { ...t, zone: newZone, status: 'DISPATCHED', etaMinutes: 8 } : t)
-    }));
-    addActivity('RESCUE_REASSIGNED', `Reassigned team ${teamId} to new zone: ${newZone}.`);
-    showToast(`Team ${teamId} reassigned to ${newZone}.`);
-  }, [addActivity, showToast]);
-
   const contextValue = {
     // State
     floodAlerts: store.floodAlerts,
     drainNodes: store.drainNodes,
     rescueTeams: store.rescueTeams,
     reliefCamps: store.reliefCamps,
+    maintenanceTasks: store.maintenanceTasks,
+    scheduledCampaigns: store.scheduledCampaigns,
     riskZones: store.riskZones,
     broadcastHistory: store.broadcastHistory,
     lastDispatchedBroadcast: store.lastDispatchedBroadcast,
     activityLog: store.activityLog,
+    isOutageActive: store.isOutageActive,
+    loraQueue: store.loraQueue,
     kpis,
     toast,
     activeDrawer,
@@ -1520,41 +1725,158 @@ export function FloodGuardProvider({ children }) {
     showToast,
     resetDemoData,
 
-    // Assignment & Failover Actions
+    // Tab 1 & Tab 3: Alerts & Assignment
     assignTeamToAlert,
     assignWorkerToBlockage,
     reassignUnit,
     markTeamOnScene,
     markAlertResolved,
+    sendPublicAlertForInundation,
+    acknowledgeAlert: (id) => {
+      setStore(prev => ({
+        ...prev,
+        floodAlerts: prev.floodAlerts.map(a => a.id === id ? { ...a, status: 'ASSIGNED' } : a)
+      }));
+      showToast(`Acknowledged alert ${id}`);
+    },
+
+    // Tab 2: Drain Telemetry & Failover
     markDrainCleared,
     simulateSensorFailure,
     restorePrimarySensor,
     simulateBlockageSpike,
+    toggleDrainMute: (drainId) => {
+      setStore(prev => ({
+        ...prev,
+        drainNodes: prev.drainNodes.map(d => d.id === drainId ? { ...d, muted: !d.muted } : d)
+      }));
+      showToast(`Mute state toggled for ${drainId}`);
+    },
 
-    // Team operations
-    recallRescueTeam,
-    cycleTeamStatus,
-    reassignRescueTeam,
+    // Tab 4: Rescue, Shelters & Campaigns
+    checkInShelter,
+    checkOutShelter,
+    scheduleAwarenessCampaign,
+    dispatchRescueTeam: (teamId, zone = 'Critical Risk Basin', etaMinutes = 10) => {
+      setStore(prev => ({
+        ...prev,
+        rescueTeams: prev.rescueTeams.map(t => t.id === teamId ? {
+          ...t,
+          status: 'DISPATCHED',
+          zone,
+          etaMinutes,
+          target: `Mobilized to ${zone}`,
+          workload: (t.workload || 0) + 1
+        } : t)
+      }));
+      showToast(`Dispatched team ${teamId} to ${zone}`);
+    },
+    recallRescueTeam: (teamId) => {
+      setStore(prev => ({
+        ...prev,
+        rescueTeams: prev.rescueTeams.map(t => t.id === teamId ? { ...t, status: 'AVAILABLE', target: null, assignedTargetId: null, workload: 0 } : t)
+      }));
+      showToast(`Recalled team ${teamId} to base.`);
+    },
+    cycleTeamStatus: (teamId, status) => {
+      setStore(prev => ({
+        ...prev,
+        rescueTeams: prev.rescueTeams.map(t => t.id === teamId ? { ...t, status } : t)
+      }));
+      showToast(`Updated status of ${teamId} to ${status}`);
+    },
+    reassignRescueTeam: (teamId, zone) => {
+      setStore(prev => ({
+        ...prev,
+        rescueTeams: prev.rescueTeams.map(t => t.id === teamId ? { ...t, zone, status: 'DISPATCHED' } : t)
+      }));
+      showToast(`Reassigned team ${teamId} to ${zone}`);
+    },
 
-    // Legacy/Existing Actions
-    acknowledgeAlert,
-    escalateAlert,
-    resolveAlert: markAlertResolved,
-    dispatchRescueTeam: assignTeamToAlert,
-    openReliefCamp,
-    closeReliefCamp,
-    updateCampOccupancy,
-    requestCampSupplies,
-    dispatchInspectionCrew,
-    markDrainUnderMaintenance,
-    requestDrainRecheck,
-    toggleDrainMute,
-    stageTeamAtRiskZone,
-    openCampForRiskZone,
-    markZoneSecured,
-    dispatchCitizenBroadcast,
-    clearBroadcastHistory,
-    triggerSendAlertForArea
+    // Tab 5: Comms & Outage
+    toggleNetworkOutage,
+    queueLoRaAlert,
+
+    // Tab 6: Maintenance Tasks
+    createMaintenanceTask,
+    completeMaintenanceTask,
+    reassignMaintenanceWorker,
+
+    // Legacy/Convenience bindings
+    openReliefCamp: (campData) => {
+      const id = typeof campData === 'string' ? campData : campData?.id;
+      setStore(prev => ({
+        ...prev,
+        reliefCamps: prev.reliefCamps.map(c => c.id === id ? { ...c, status: 'ACTIVE' } : c)
+      }));
+      showToast('Shelter activated!');
+    },
+    closeReliefCamp: (id) => {
+      setStore(prev => ({
+        ...prev,
+        reliefCamps: prev.reliefCamps.map(c => c.id === id ? { ...c, status: 'CLOSED', occupancy: 0 } : c)
+      }));
+      showToast('Shelter closed.');
+    },
+    updateCampOccupancy: (id, delta) => {
+      if (delta > 0) checkInShelter(id, delta);
+      else checkOutShelter(id, Math.abs(delta));
+    },
+    requestCampSupplies: (id) => {
+      showToast(`Replenishment shipment dispatched to shelter ${id}!`);
+    },
+    dispatchInspectionCrew: (id) => assignWorkerToBlockage(id),
+    markDrainUnderMaintenance: (id) => {
+      setStore(prev => ({
+        ...prev,
+        drainNodes: prev.drainNodes.map(d => d.id === id ? { ...d, operationalStatus: 'UNDER_MAINTENANCE' } : d)
+      }));
+      showToast(`${id} flagged as under maintenance.`);
+    },
+    stageTeamAtRiskZone: (zoneId, teamId) => {
+      showToast(`Team ${teamId} staged at zone ${zoneId}!`);
+    },
+    openCampForRiskZone: (zoneId, campId) => {
+      checkInShelter(campId, 50);
+    },
+    markZoneSecured: (zoneId) => {
+      setStore(prev => ({
+        ...prev,
+        riskZones: prev.riskZones.map(z => z.id === zoneId ? { ...z, isSecured: true } : z)
+      }));
+      showToast(`Zone ${zoneId} secured.`);
+    },
+    dispatchCitizenBroadcast: (payload) => {
+      const newHistoryEntry = {
+        id: `SIM-DISPATCH-${Math.floor(1000 + Math.random() * 9000)}`,
+        level: payload.level,
+        area: payload.area,
+        language: payload.language,
+        encoding: payload.encoding || 'GSM-7',
+        segments: payload.segments || 1,
+        message: payload.message,
+        sentAt: 'Just now',
+        timestamp: Date.now(),
+        recipients: payload.recipients || 3770,
+        deliveryStatus: 'Delivered',
+        deliveryPct: 98.8,
+        isSimulated: true
+      };
+      setStore(prev => ({
+        ...prev,
+        broadcastHistory: [newHistoryEntry, ...prev.broadcastHistory]
+      }));
+      showToast(`Broadcast dispatched to ${payload.recipients || 3770} citizens!`);
+      return newHistoryEntry;
+    },
+    clearBroadcastHistory: () => {
+      setStore(prev => ({ ...prev, broadcastHistory: [] }));
+      showToast('Broadcast history cleared.');
+    },
+    triggerSendAlertForArea: (areaName, defaultLevel = 'DANGER') => {
+      setAlertPrefillParams({ area: areaName, level: defaultLevel });
+      setActiveTabIntent('alerts');
+    }
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Wrench,
   CheckCircle2,
@@ -18,20 +18,78 @@ import {
   TrendingUp,
   AlertCircle,
   Truck,
-  Sparkles
+  Sparkles,
+  MapPin,
+  UserCheck
 } from 'lucide-react';
 import { MAINTENANCE_CONFIG } from '../services/maintenanceSim';
+import { useFloodGuard } from '../context/FloodGuardStore';
 
 export default function MaintenanceModule({
   maintenanceData,
   onScheduleJob,
   onCompleteJob
 }) {
+  const {
+    maintenanceTasks,
+    drainNodes,
+    rescueTeams,
+    completeMaintenanceTask,
+    createMaintenanceTask,
+    reassignMaintenanceWorker,
+    showToast
+  } = useFloodGuard();
+
   const [activeSubSection, setActiveSubSection] = useState('all'); // 'all', 'flood', 'drainage', 'schedule'
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterPriority, setFilterPriority] = useState('ALL');
   const [filterZone, setFilterZone] = useState('ALL');
   const [sortBy, setSortBy] = useState('blockage-desc');
+
+  // Tab 6 Task Filters & Search State
+  const [taskStatusFilter, setTaskStatusFilter] = useState('ALL');
+  const [taskPriorityFilter, setTaskPriorityFilter] = useState('ALL');
+  const [taskSearchTerm, setTaskSearchTerm] = useState('');
+
+  // Modals for Create Task & Reassign Worker
+  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
+  const [createTaskForm, setCreateTaskForm] = useState({
+    title: '',
+    location: '',
+    drainId: '',
+    type: 'Mechanical Desilting',
+    priority: 'HIGH',
+    assignedWorker: '',
+    assignedWorkerId: '',
+    dueDate: 'Today, within 4h',
+    preRainTag: true,
+    notes: ''
+  });
+  const [createFormError, setCreateFormError] = useState('');
+
+  const [reassignModalTask, setReassignModalTask] = useState(null);
+  const [newWorkerSelect, setNewWorkerSelect] = useState('');
+  const [reassignFormError, setReassignFormError] = useState('');
+
+  const availableCleaningWorkers = useMemo(() => {
+    return (rescueTeams || []).filter(t => t.type === 'CLEANING');
+  }, [rescueTeams]);
+
+  const filteredTasks = useMemo(() => {
+    return (maintenanceTasks || []).filter(task => {
+      if (taskStatusFilter !== 'ALL' && task.status !== taskStatusFilter) return false;
+      if (taskPriorityFilter !== 'ALL' && task.priority !== taskPriorityFilter) return false;
+      if (taskSearchTerm.trim()) {
+        const term = taskSearchTerm.toLowerCase();
+        const matchesLoc = task.location?.toLowerCase().includes(term);
+        const matchesTitle = task.title?.toLowerCase().includes(term);
+        const matchesWorker = task.assignedWorker?.toLowerCase().includes(term);
+        const matchesId = task.id?.toLowerCase().includes(term);
+        if (!matchesLoc && !matchesTitle && !matchesWorker && !matchesId) return false;
+      }
+      return true;
+    });
+  }, [maintenanceTasks, taskStatusFilter, taskPriorityFilter, taskSearchTerm]);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -161,6 +219,779 @@ export default function MaintenanceModule({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      
+      {/* =====================================================================
+          TAB 6 REQUIREMENT: MAINTENANCE TASKS & DRAIN UPKEEP REGISTRY
+          ===================================================================== */}
+      <div style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-medium)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '22px',
+        boxShadow: 'var(--shadow-sm)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px'
+      }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Wrench size={20} color="var(--gov-blue-700)" />
+              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                Drainage Maintenance &amp; Upkeep Tasks
+              </h3>
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 800,
+                padding: '2px 8px',
+                borderRadius: '999px',
+                background: 'rgba(59, 130, 246, 0.15)',
+                color: '#3B82F6',
+                border: '1px solid rgba(59, 130, 246, 0.3)'
+              }}>
+                {filteredTasks.length} Work Orders
+              </span>
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+              Track and assign desilting operations. Marking a task Done automatically clears the blockage everywhere and frees the assigned worker.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsCreateTaskModalOpen(true);
+              setCreateFormError('');
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--gov-blue-700)',
+              color: '#FFFFFF',
+              border: 'none',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: 'var(--shadow-sm)'
+            }}
+          >
+            <Plus size={14} />
+            <span>Create Task</span>
+          </button>
+        </div>
+
+        {/* Filter and Search Bar */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '10px',
+          background: 'var(--bg-secondary)',
+          padding: '12px 14px',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border-light)'
+        }}>
+          {/* Search */}
+          <div style={{ flex: '1 1 240px', minWidth: '180px' }}>
+            <input
+              type="text"
+              placeholder="Search tasks by location, title, worker or ID..."
+              value={taskSearchTerm}
+              onChange={(e) => setTaskSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '7px 12px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border-medium)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: '12px',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          {/* Status Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>Status:</span>
+            {['ALL', 'OPEN', 'IN_PROGRESS', 'DONE'].map(st => (
+              <button
+                key={st}
+                type="button"
+                onClick={() => setTaskStatusFilter(st)}
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '4px 8px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid',
+                  borderColor: taskStatusFilter === st ? 'var(--gov-blue-700)' : 'var(--border-medium)',
+                  background: taskStatusFilter === st ? 'var(--gov-blue-700)' : 'var(--bg-primary)',
+                  color: taskStatusFilter === st ? '#FFFFFF' : 'var(--text-secondary)',
+                  cursor: 'pointer'
+                }}
+              >
+                {st === 'IN_PROGRESS' ? 'IN PROGRESS' : st}
+              </button>
+            ))}
+          </div>
+
+          {/* Priority Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>Priority:</span>
+            {['ALL', 'URGENT', 'HIGH', 'MEDIUM'].map(p => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setTaskPriorityFilter(p)}
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '4px 8px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid',
+                  borderColor: taskPriorityFilter === p ? 'var(--gov-blue-700)' : 'var(--border-medium)',
+                  background: taskPriorityFilter === p ? 'var(--gov-blue-700)' : 'var(--bg-primary)',
+                  color: taskPriorityFilter === p ? '#FFFFFF' : 'var(--text-secondary)',
+                  cursor: 'pointer'
+                }}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tasks Cards List */}
+        {filteredTasks.length === 0 ? (
+          <div style={{
+            padding: '36px',
+            textAlign: 'center',
+            background: 'var(--bg-secondary)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px dashed var(--border-medium)',
+            color: 'var(--text-muted)',
+            fontSize: '13px'
+          }}>
+            No maintenance tasks matching the filter criteria.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {filteredTasks.map(task => {
+              const isDone = task.status === 'DONE';
+              const isInProgress = task.status === 'IN_PROGRESS';
+              const isUrgent = task.priority === 'URGENT';
+              const isHigh = task.priority === 'HIGH';
+
+              const priorityColor = isUrgent ? '#EF4444' : isHigh ? '#F59E0B' : 'var(--gov-blue-700)';
+
+              return (
+                <div
+                  key={task.id}
+                  style={{
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-medium)',
+                    borderLeft: `5px solid ${isDone ? '#10B981' : priorityColor}`,
+                    borderRadius: 'var(--radius-md)',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+                          {task.id}
+                        </span>
+                        <h4 style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                          {task.title}
+                        </h4>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <MapPin size={13} color="var(--gov-blue-700)" />
+                        <strong>{task.location}</strong> {task.drainId && <span>({task.drainId})</span>}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      {task.preRainTag && (
+                        <span style={{
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          color: '#EF4444',
+                          border: '1px solid rgba(239, 68, 68, 0.35)',
+                          padding: '2px 6px',
+                          borderRadius: '4px'
+                        }}>
+                          ⚡ Pre-Rain Mandate
+                        </span>
+                      )}
+
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        background: `${priorityColor}15`,
+                        color: priorityColor,
+                        border: `1px solid ${priorityColor}40`
+                      }}>
+                        {task.priority}
+                      </span>
+
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        background: isDone ? 'rgba(16, 185, 129, 0.15)' : isInProgress ? 'rgba(245, 158, 11, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                        color: isDone ? '#10B981' : isInProgress ? '#F59E0B' : '#3B82F6',
+                        border: '1px solid currentColor'
+                      }}>
+                        {isDone ? 'DONE' : isInProgress ? 'IN PROGRESS' : 'OPEN'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Task Metadata Strip */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: '8px',
+                    background: 'var(--bg-primary)',
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-light)',
+                    fontSize: '12px'
+                  }}>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Type: </span>
+                      <strong>{task.type}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Due Date: </span>
+                      <strong style={{ fontFamily: 'var(--font-mono)' }}>{task.dueDate}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Assigned Worker: </span>
+                      <strong style={{ color: task.assignedWorker && task.assignedWorker !== 'Unassigned' ? '#3B82F6' : '#F59E0B' }}>
+                        {task.assignedWorker || 'Unassigned'}
+                      </strong>
+                    </div>
+                    {task.notes && (
+                      <div style={{ gridColumn: '1 / -1', color: 'var(--text-secondary)', fontSize: '11px' }}>
+                        <strong>Notes:</strong> {task.notes}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions Bar */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    flexWrap: 'wrap',
+                    paddingTop: '6px',
+                    borderTop: '1px solid var(--border-light)'
+                  }}>
+                    {!isDone ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => completeMaintenanceTask(task.id)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            border: '1px solid rgba(16, 185, 129, 0.4)',
+                            color: '#10B981',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ✓ Mark Done &amp; Clear Blockage
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReassignModalTask(task);
+                            setNewWorkerSelect('');
+                            setReassignFormError('');
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'var(--bg-primary)',
+                            border: '1px solid var(--border-medium)',
+                            color: 'var(--text-primary)',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Reassign Worker
+                        </button>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircle2 size={13} color="#10B981" />
+                        <span>Task Completed &bull; Blockage cleared from network telemetry &amp; worker released</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* MODAL 1: CREATE TASK */}
+        {isCreateTaskModalOpen && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '16px'
+          }}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!createTaskForm.title.trim()) {
+                  setCreateFormError('Please enter a task title.');
+                  return;
+                }
+                if (!createTaskForm.location.trim()) {
+                  setCreateFormError('Please enter a location or select a drain.');
+                  return;
+                }
+                if (!createTaskForm.dueDate.trim()) {
+                  setCreateFormError('Please enter a due date or timeframe.');
+                  return;
+                }
+
+                const workerObj = availableCleaningWorkers.find(w => w.id === createTaskForm.assignedWorkerId);
+                const workerLabel = workerObj
+                  ? `${workerObj.name} (${workerObj.leadWorker || 'Lead'})`
+                  : (createTaskForm.assignedWorker || 'Unassigned');
+
+                createMaintenanceTask({
+                  title: createTaskForm.title,
+                  location: createTaskForm.location,
+                  drainId: createTaskForm.drainId || null,
+                  type: createTaskForm.type,
+                  priority: createTaskForm.priority,
+                  assignedWorker: workerLabel,
+                  assignedWorkerId: workerObj?.id || null,
+                  dueDate: createTaskForm.dueDate,
+                  preRainTag: createTaskForm.preRainTag,
+                  notes: createTaskForm.notes
+                });
+
+                setIsCreateTaskModalOpen(false);
+                setCreateTaskForm({
+                  title: '',
+                  location: '',
+                  drainId: '',
+                  type: 'Mechanical Desilting',
+                  priority: 'HIGH',
+                  assignedWorker: '',
+                  assignedWorkerId: '',
+                  dueDate: 'Today, within 4h',
+                  preRainTag: true,
+                  notes: ''
+                });
+                setCreateFormError('');
+              }}
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-medium)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '24px',
+                maxWidth: '540px',
+                width: '100%',
+                boxShadow: 'var(--shadow-xl)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px'
+              }}
+            >
+              <div>
+                <h4 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                  Create Maintenance &amp; Desilting Task
+                </h4>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  Schedule municipal cleaning operations and auto-link to drainage telemetry.
+                </p>
+              </div>
+
+              {createFormError && (
+                <div style={{
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#EF4444',
+                  fontSize: '12px',
+                  fontWeight: 600
+                }}>
+                  ⚠️ {createFormError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 700 }}>Task Title *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Emergency Vacuum Desilting Culvert C-8"
+                  value={createTaskForm.title}
+                  onChange={(e) => setCreateTaskForm({ ...createTaskForm, title: e.target.value })}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-medium)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 700 }}>Link Drainage Node</label>
+                  <select
+                    value={createTaskForm.drainId}
+                    onChange={(e) => {
+                      const selDrain = (drainNodes || []).find(d => d.id === e.target.value);
+                      setCreateTaskForm({
+                        ...createTaskForm,
+                        drainId: e.target.value,
+                        location: selDrain ? selDrain.location : createTaskForm.location
+                      });
+                    }}
+                    style={{
+                      padding: '8px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-medium)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="">(Manual Location / Unlinked)</option>
+                    {(drainNodes || []).map(d => (
+                      <option key={d.id} value={d.id}>{d.id} — {d.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 700 }}>Location / Sector *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Ward 14 Industrial Culvert C-8"
+                    value={createTaskForm.location}
+                    onChange={(e) => setCreateTaskForm({ ...createTaskForm, location: e.target.value })}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-medium)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '12px'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 700 }}>Task Type</label>
+                  <select
+                    value={createTaskForm.type}
+                    onChange={(e) => setCreateTaskForm({ ...createTaskForm, type: e.target.value })}
+                    style={{
+                      padding: '8px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-medium)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="Mechanical Desilting">Mechanical Desilting</option>
+                    <option value="Sediment Clearing">Sediment Clearing</option>
+                    <option value="Trash Rack Clearing">Trash Rack Clearing</option>
+                    <option value="Pumping Sump Overhaul">Pumping Sump Overhaul</option>
+                    <option value="Emergency Dredging">Emergency Dredging</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 700 }}>Priority</label>
+                  <select
+                    value={createTaskForm.priority}
+                    onChange={(e) => setCreateTaskForm({ ...createTaskForm, priority: e.target.value })}
+                    style={{
+                      padding: '8px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-medium)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="URGENT">URGENT</option>
+                    <option value="HIGH">HIGH</option>
+                    <option value="MEDIUM">MEDIUM</option>
+                    <option value="LOW">LOW</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 700 }}>Assign Cleaning Crew</label>
+                  <select
+                    value={createTaskForm.assignedWorkerId}
+                    onChange={(e) => setCreateTaskForm({ ...createTaskForm, assignedWorkerId: e.target.value })}
+                    style={{
+                      padding: '8px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-medium)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="">(Unassigned / Assign Later)</option>
+                    {availableCleaningWorkers.map(w => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.leadWorker || 'Crew'}) — {w.zone}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 700 }}>Due Date / Window *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Today, 16:00 or Tomorrow, 10:00"
+                    value={createTaskForm.dueDate}
+                    onChange={(e) => setCreateTaskForm({ ...createTaskForm, dueDate: e.target.value })}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-medium)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '12px'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  id="preRainCheck"
+                  checked={createTaskForm.preRainTag}
+                  onChange={(e) => setCreateTaskForm({ ...createTaskForm, preRainTag: e.target.checked })}
+                />
+                <label htmlFor="preRainCheck" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  Flag as Pre-Monsoon / Storm Clearance Mandate
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateTaskModalOpen(false)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-secondary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--gov-blue-700)',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Save Task
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* MODAL 2: REASSIGN WORKER */}
+        {reassignModalTask && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '16px'
+          }}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newWorkerSelect) {
+                  setReassignFormError('Please select a replacement worker or crew.');
+                  return;
+                }
+
+                const workerObj = availableCleaningWorkers.find(w => w.id === newWorkerSelect);
+                const workerLabel = workerObj ? `${workerObj.name} (${workerObj.leadWorker || 'Lead'})` : newWorkerSelect;
+
+                reassignMaintenanceWorker(reassignModalTask.id, workerLabel, workerObj?.id || null);
+                setReassignModalTask(null);
+                setNewWorkerSelect('');
+                setReassignFormError('');
+              }}
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-medium)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '24px',
+                maxWidth: '500px',
+                width: '100%',
+                boxShadow: 'var(--shadow-xl)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px'
+              }}
+            >
+              <div>
+                <h4 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                  Reassign Maintenance Crew
+                </h4>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  {reassignModalTask.id}: {reassignModalTask.title} ({reassignModalTask.location})
+                </p>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Currently assigned: <strong>{reassignModalTask.assignedWorker || 'Unassigned'}</strong>
+                </div>
+              </div>
+
+              {reassignFormError && (
+                <div style={{
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#EF4444',
+                  fontSize: '12px',
+                  fontWeight: 600
+                }}>
+                  ⚠️ {reassignFormError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 700 }}>Select New Cleaning Crew *</label>
+                <select
+                  value={newWorkerSelect}
+                  onChange={(e) => setNewWorkerSelect(e.target.value)}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-medium)',
+                    background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px'
+                  }}
+                >
+                  <option value="">Select a cleaning crew...</option>
+                  {availableCleaningWorkers.map(w => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} — {w.leadWorker || 'Supervisor'} ({w.zone}) &bull; Status: {w.status}
+                    </option>
+                  ))}
+                  <option value="Municipal Emergency PWD Trench Unit">Municipal Emergency PWD Trench Unit</option>
+                  <option value="District Mechanical Dredging Corps">District Mechanical Dredging Corps</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setReassignModalTask(null)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-secondary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--gov-blue-700)',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Confirm Reassign
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
       
       {/* =====================================================================
           1. TOP SUMMARY CARDS

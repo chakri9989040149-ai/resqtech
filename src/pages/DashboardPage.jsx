@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   RefreshCw,
   LogOut,
@@ -89,13 +89,56 @@ export default function DashboardPage() {
     stageTeamAtRiskZone,
     openCampForRiskZone,
     markZoneSecured,
-    triggerSendAlertForArea
+    triggerSendAlertForArea,
+    isOutageActive,
+    loraQueue,
+    toggleNetworkOutage,
+    queueLoRaAlert,
+    scheduledCampaigns,
+    scheduleAwarenessCampaign,
+    checkInShelter,
+    checkOutShelter,
+    dispatchRescueTeam,
+    recallRescueTeam,
+    cycleTeamStatus,
+    reassignRescueTeam
   } = useFloodGuard();
 
-  const [activeTab, setActiveTab] = useState('overview');
+  // Tab persistence via sessionStorage
+  const [activeTab, setActiveTab] = useState(() => {
+    return sessionStorage.getItem('floodguard_active_tab') || 'overview';
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('floodguard_active_tab', activeTab);
+  }, [activeTab]);
+
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [lastUpdated, setLastUpdated] = useState(() => new Date().toLocaleTimeString());
+
+  // Tab 2 Drain Filter, Search & Sort
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [drainSearchTerm, setDrainSearchTerm] = useState('');
+  const [drainSortBy, setDrainSortBy] = useState('blockage-desc');
+
+  // Tab 4 Awareness Campaign Modal State
+  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [campaignForm, setCampaignForm] = useState({
+    zone: 'Ward 4 (Riverside)',
+    title: '',
+    scheduledDate: 'Tomorrow, 10:00 AM',
+    targetHouseholds: 1200,
+    linkedAlertId: '',
+    channel: 'Loudspeaker PA Van & SMS Alert'
+  });
+  const [campaignFormError, setCampaignFormError] = useState('');
+
+  // Tab 5 Emergency LoRa Queue Form State
+  const [isLoRaQueueModalOpen, setIsLoRaQueueModalOpen] = useState(false);
+  const [loraQueueForm, setLoraQueueForm] = useState({
+    zone: 'Ward 14 (Industrial Area)',
+    message: 'EMERGENCY: River overflow cresting weir. Evacuate to Model High School immediately.'
+  });
 
   // Handle cross-tab navigation intent
   useEffect(() => {
@@ -173,10 +216,64 @@ export default function DashboardPage() {
 
   const handleRefresh = () => {
     setLastUpdated(new Date().toLocaleTimeString());
-  };  const filteredNodes = (drainNodes || []).filter(node => {
-    if (filterStatus === 'ALL') return true;
-    return node.status === filterStatus;
-  });
+  };
+
+  const TABS_LIST = [
+    { id: 'overview', label: '1. Overview', desc: 'Summary & Map' },
+    { id: 'drain-monitoring', label: '2. Drain Monitoring', desc: 'Sensor Readings' },
+    { id: 'alerts', label: '3. Alerts', desc: 'Flood Alert Center' },
+    { id: 'rescue-relief', label: '4. Rescue & Relief', desc: 'Teams & Shelters' },
+    { id: 'offline-lora', label: '5. Offline & LoRa', desc: 'Comms Health' },
+    { id: 'maintenance', label: '6. Maintenance', desc: 'Flood & Drain Upkeep' }
+  ];
+
+  const handleTabKeyDown = (e, index) => {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const nextIdx = (index + 1) % TABS_LIST.length;
+      setActiveTab(TABS_LIST[nextIdx].id);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prevIdx = (index - 1 + TABS_LIST.length) % TABS_LIST.length;
+      setActiveTab(TABS_LIST[prevIdx].id);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setActiveTab(TABS_LIST[0].id);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setActiveTab(TABS_LIST[TABS_LIST.length - 1].id);
+    }
+  };
+
+  const filteredNodes = useMemo(() => {
+    return (drainNodes || [])
+      .filter(node => {
+        if (filterStatus !== 'ALL' && node.status !== filterStatus) return false;
+        if (drainSearchTerm.trim()) {
+          const term = drainSearchTerm.toLowerCase();
+          const matchesId = node.id?.toLowerCase().includes(term);
+          const matchesName = node.name?.toLowerCase().includes(term);
+          const matchesLoc = node.location?.toLowerCase().includes(term);
+          const matchesZone = node.zone?.toLowerCase().includes(term);
+          if (!matchesId && !matchesName && !matchesLoc && !matchesZone) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (drainSortBy === 'blockage-desc') return (b.blockagePct || 0) - (a.blockagePct || 0);
+        if (drainSortBy === 'blockage-asc') return (a.blockagePct || 0) - (b.blockagePct || 0);
+        if (drainSortBy === 'water-desc') {
+          const wA = parseFloat(a.waterLevel) || 0;
+          const wB = parseFloat(b.waterLevel) || 0;
+          return wB - wA;
+        }
+        if (drainSortBy === 'severity') {
+          const pMap = { CRITICAL: 3, WARNING: 2, NORMAL: 1 };
+          return (pMap[b.status] || 0) - (pMap[a.status] || 0);
+        }
+        return a.id.localeCompare(b.id);
+      });
+  }, [drainNodes, filterStatus, drainSearchTerm, drainSortBy]);
 
   return (
     <div style={{
@@ -313,29 +410,32 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* SECTION 2: FIVE CLEAN TABS (No horizontal scroll, fully responsive) */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-        gap: '8px',
-        background: 'var(--bg-secondary)',
-        padding: '6px',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--border-light)'
-      }}>
-        {[
-          { id: 'overview', label: '1. Overview', desc: 'Summary & Map' },
-          { id: 'drain-monitoring', label: '2. Drain Monitoring', desc: 'Sensor Readings' },
-          { id: 'alerts', label: '3. Alerts', desc: 'Flood Alert Center' },
-          { id: 'rescue-relief', label: '4. Rescue & Relief', desc: 'Teams & Shelters' },
-          { id: 'offline-lora', label: '5. Offline & LoRa', desc: 'Comms Health' },
-          { id: 'maintenance', label: '6. Maintenance', desc: 'Flood & Drain Upkeep' }
-        ].map(tab => {
+      {/* SECTION 2: SIX CLEAN TABS (Accessible tablist with arrow keys & persistence) */}
+      <div
+        role="tablist"
+        aria-label="FloodGuard Command Center Tabs"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+          gap: '8px',
+          background: 'var(--bg-secondary)',
+          padding: '6px',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border-light)'
+        }}
+      >
+        {TABS_LIST.map((tab, idx) => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
+              role="tab"
+              id={`tab-button-${tab.id}`}
+              aria-selected={isActive}
+              aria-controls={`tab-panel-${tab.id}`}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => setActiveTab(tab.id)}
+              onKeyDown={(e) => handleTabKeyDown(e, idx)}
               style={{
                 padding: '10px 14px',
                 borderRadius: 'var(--radius-sm)',
@@ -344,6 +444,7 @@ export default function DashboardPage() {
                 color: isActive ? '#FFFFFF' : 'var(--text-primary)',
                 border: 'none',
                 boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
+                cursor: 'pointer',
                 transition: 'all 0.15s'
               }}
             >
@@ -707,6 +808,54 @@ export default function DashboardPage() {
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Click any node on the map to inspect live water depth and blockage index</p>
               </div>
               <GisMiniMap maintenanceDrains={maintenanceData?.drains || []} />
+
+              {/* Quick Node Selector (Selecting list item highlights its node on map) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>
+                    Select node to highlight on GIS Map:
+                  </span>
+                  <span style={{ fontSize: '10px', color: 'var(--gov-blue-700)', fontWeight: 600 }}>
+                    Active: <strong>{selectedMapNodeId}</strong>
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '6px' }}>
+                  {(drainNodes || []).map(node => {
+                    const isSelected = selectedMapNodeId === node.id;
+                    return (
+                      <button
+                        key={node.id}
+                        type="button"
+                        onClick={() => setSelectedMapNodeId(node.id)}
+                        style={{
+                          padding: '6px 8px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: `1px solid ${isSelected ? 'var(--gov-blue-700)' : 'var(--border-medium)'}`,
+                          background: isSelected ? 'rgba(2, 132, 199, 0.15)' : 'var(--bg-secondary)',
+                          color: isSelected ? 'var(--gov-blue-700)' : 'var(--text-primary)',
+                          fontSize: '11px',
+                          fontWeight: isSelected ? 800 : 600,
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        <span>{node.id.replace('NODE-', '')}</span>
+                        <span style={{
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          color: node.blockagePct >= 60 ? '#EF4444' : node.blockagePct >= 25 ? '#F59E0B' : '#10B981',
+                          fontFamily: 'var(--font-mono)'
+                        }}>
+                          {node.blockagePct}%
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -794,30 +943,91 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            {/* Filter buttons */}
-            <div style={{ display: 'flex', gap: '6px' }}>
-              {['ALL', 'CRITICAL', 'WARNING', 'NORMAL'].map(s => (
-                <button
-                  key={s}
-                  onClick={() => setFilterStatus(s)}
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    padding: '4px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid',
-                    borderColor: filterStatus === s ? 'var(--gov-blue-700)' : 'var(--border-medium)',
-                    background: filterStatus === s ? 'var(--gov-blue-700)' : 'var(--bg-secondary)',
-                    color: filterStatus === s ? '#FFFFFF' : 'var(--text-secondary)'
-                  }}
-                >
-                  {s}
-                </button>
-              ))}
+            {/* Search, Filter & Sort Controls */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              flexWrap: 'wrap'
+            }}>
+              {/* Search input */}
+              <input
+                type="text"
+                placeholder="Search drains by ID, name or zone..."
+                value={drainSearchTerm}
+                onChange={(e) => setDrainSearchTerm(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-medium)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '12px',
+                  minWidth: '200px'
+                }}
+              />
+
+              {/* Status Filter buttons */}
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {['ALL', 'CRITICAL', 'WARNING', 'NORMAL'].map(s => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setFilterStatus(s)}
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      padding: '5px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid',
+                      borderColor: filterStatus === s ? 'var(--gov-blue-700)' : 'var(--border-medium)',
+                      background: filterStatus === s ? 'var(--gov-blue-700)' : 'var(--bg-secondary)',
+                      color: filterStatus === s ? '#FFFFFF' : 'var(--text-secondary)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+
+              {/* Sort by Severity Dropdown */}
+              <select
+                value={drainSortBy}
+                onChange={(e) => setDrainSortBy(e.target.value)}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-medium)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '12px',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="blockage-desc">Sort: Blockage (High to Low)</option>
+                <option value="blockage-asc">Sort: Blockage (Low to High)</option>
+                <option value="water-desc">Sort: Water Level (High to Low)</option>
+                <option value="severity">Sort: Severity (Critical First)</option>
+                <option value="name">Sort: Node ID (A-Z)</option>
+              </select>
             </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {filteredNodes.length === 0 ? (
+              <div style={{
+                padding: '36px',
+                textAlign: 'center',
+                background: 'var(--bg-secondary)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px dashed var(--border-medium)',
+                color: 'var(--text-muted)',
+                fontSize: '13px'
+              }}>
+                No drain monitoring nodes match your search and filter criteria.
+              </div>
+            ) : null}
             {filteredNodes.map(node => {
               const isCritical = node.status === 'CRITICAL';
               const isWarning = node.status === 'WARNING';
@@ -1076,6 +1286,24 @@ export default function DashboardPage() {
                         Restore Primary Sensor
                       </button>
                     )}
+
+                    {/* Spike Blockage Button */}
+                    <button
+                      onClick={() => simulateBlockageSpike(node.id, 88)}
+                      style={{
+                        padding: '5px 10px',
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        border: '1px solid rgba(239, 68, 68, 0.35)',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#EF4444',
+                        cursor: 'pointer'
+                      }}
+                      aria-label={`Simulate sudden blockage spike on ${node.id}`}
+                    >
+                      ⚡ Spike Blockage (88%)
+                    </button>
 
                     <button
                       onClick={() => assignWorkerToBlockage(node.id)}
@@ -1375,8 +1603,27 @@ export default function DashboardPage() {
                       </span>
                     </div>
 
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '11px', background: 'var(--bg-primary)', padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Role: </span>
+                        <strong style={{ color: 'var(--gov-blue-700)' }}>{team.role || 'Flood Evacuation'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Workload: </span>
+                        <strong style={{ color: (team.workload || (isStandbyOrAvail ? 0 : 1)) > 1 ? '#EF4444' : 'var(--text-primary)' }}>
+                          {team.workload ?? (isStandbyOrAvail ? 0 : 1)} active task{(team.workload || (isStandbyOrAvail ? 0 : 1)) === 1 ? '' : 's'}
+                        </strong>
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Current Task: </span>
+                        <strong style={{ color: 'var(--text-primary)' }}>
+                          {team.target || (isStandbyOrAvail ? 'Standby at Depot Reserve' : 'Deploying to Flood Basin')}
+                        </strong>
+                      </div>
+                    </div>
+
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      Assigned Area: <strong>{team.zone || 'Command Depot Reserve'}</strong>
+                      Assigned Location: <strong>{team.zone || team.location || 'Command Depot Reserve'}</strong>
                     </div>
 
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -1544,37 +1791,39 @@ export default function DashboardPage() {
                     </button>
 
                     <button
-                      onClick={() => updateCampOccupancy(camp.id, 50)}
+                      onClick={() => checkInShelter(camp.id, 50)}
                       disabled={camp.status !== 'ACTIVE' || camp.occupancy >= camp.capacity}
                       style={{
-                        padding: '3px 6px',
-                        background: 'var(--bg-primary)',
-                        border: '1px solid var(--border-medium)',
+                        padding: '3px 8px',
+                        background: 'rgba(16, 185, 129, 0.1)',
+                        border: '1px solid rgba(16, 185, 129, 0.4)',
                         borderRadius: 'var(--radius-sm)',
                         fontSize: '10px',
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
+                        fontWeight: 700,
+                        color: '#10B981',
                         cursor: (camp.status !== 'ACTIVE' || camp.occupancy >= camp.capacity) ? 'not-allowed' : 'pointer'
                       }}
+                      aria-label={`Check in 50 evacuees to ${camp.name}`}
                     >
-                      +50
+                      Check in (+50)
                     </button>
 
                     <button
-                      onClick={() => updateCampOccupancy(camp.id, -50)}
+                      onClick={() => checkOutShelter(camp.id, 50)}
                       disabled={camp.status !== 'ACTIVE' || camp.occupancy <= 0}
                       style={{
-                        padding: '3px 6px',
-                        background: 'var(--bg-primary)',
-                        border: '1px solid var(--border-medium)',
+                        padding: '3px 8px',
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
                         borderRadius: 'var(--radius-sm)',
                         fontSize: '10px',
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
+                        fontWeight: 700,
+                        color: '#EF4444',
                         cursor: (camp.status !== 'ACTIVE' || camp.occupancy <= 0) ? 'not-allowed' : 'pointer'
                       }}
+                      aria-label={`Check out 50 citizens from ${camp.name}`}
                     >
-                      -50
+                      Check out (-50)
                     </button>
 
                     <button
@@ -1660,6 +1909,261 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
+
+          {/* Preventive Awareness Campaign Scheduling Section */}
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-medium)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '20px',
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>Preventive Awareness &amp; Evacuation Campaigns</h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                  Pre-monsoon and storm mobilization drives: loudspeaker vans, community drills, and direct SMS alerts for high-risk wards.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCampaignForm({
+                    zone: 'Ward 4 (Riverside)',
+                    title: '',
+                    scheduledDate: 'Tomorrow, 10:00 AM',
+                    targetHouseholds: 1200,
+                    linkedAlertId: '',
+                    channel: 'Loudspeaker PA Van & SMS Alert'
+                  });
+                  setCampaignFormError('');
+                  setIsCampaignModalOpen(true);
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--gov-blue-700)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <Plus size={14} />
+                <span>Schedule Campaign</span>
+              </button>
+            </div>
+
+            {/* Campaign Cards List */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px' }}>
+              {(scheduledCampaigns || []).length === 0 ? (
+                <div style={{
+                  gridColumn: '1 / -1',
+                  padding: '24px',
+                  textAlign: 'center',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--text-muted)',
+                  fontSize: '12px'
+                }}>
+                  No awareness campaigns currently scheduled. Click above to schedule a pre-flood campaign.
+                </div>
+              ) : (
+                scheduledCampaigns.map(camp => (
+                  <div
+                    key={camp.id}
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-light)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--text-primary)' }}>
+                          {camp.title}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {camp.zone}
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        background: 'rgba(59, 130, 246, 0.15)',
+                        color: '#3B82F6',
+                        border: '1px solid rgba(59, 130, 246, 0.3)'
+                      }}>
+                        {camp.status || 'SCHEDULED'}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      Channel: <strong>{camp.channel}</strong>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-muted)', paddingTop: '6px', borderTop: '1px solid var(--border-light)' }}>
+                      <span>Target: <strong>{camp.targetHouseholds} households</strong></span>
+                      <span style={{ fontFamily: 'var(--font-mono)' }}>{camp.scheduledDate}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Schedule Campaign Modal */}
+          {isCampaignModalOpen && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.7)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '16px'
+            }}>
+              <div style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-medium)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '24px',
+                maxWidth: '480px',
+                width: '100%',
+                boxShadow: 'var(--shadow-lg)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>Schedule Preventive Awareness Campaign</h3>
+                  <button
+                    onClick={() => setIsCampaignModalOpen(false)}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {campaignFormError && (
+                  <div style={{
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    color: '#EF4444',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}>
+                    {campaignFormError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12px' }}>
+                  <div>
+                    <label style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>Target Zone / Ward:</label>
+                    <select
+                      value={campaignForm.zone}
+                      onChange={(e) => setCampaignForm(prev => ({ ...prev, zone: e.target.value }))}
+                      style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="Ward 4 (Riverside)">Ward 4 (Riverside Lowlands)</option>
+                      <option value="Ward 14 (Industrial Area)">Ward 14 (Industrial Area)</option>
+                      <option value="Ward 9 (Commercial Sector)">Ward 9 (Commercial Sector)</option>
+                      <option value="Ward 11 (Market Road Catchment)">Ward 11 (Market Road Catchment)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>Campaign Title &amp; Objective:</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Flash Flood Evacuation Drill & PA Announcements"
+                      value={campaignForm.title}
+                      onChange={(e) => setCampaignForm(prev => ({ ...prev, title: e.target.value }))}
+                      style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>Scheduled Date / Time:</label>
+                      <input
+                        type="text"
+                        value={campaignForm.scheduledDate}
+                        onChange={(e) => setCampaignForm(prev => ({ ...prev, scheduledDate: e.target.value }))}
+                        style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>Target Households:</label>
+                      <input
+                        type="number"
+                        value={campaignForm.targetHouseholds}
+                        onChange={(e) => setCampaignForm(prev => ({ ...prev, targetHouseholds: Number(e.target.value) || 0 }))}
+                        style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>Broadcast &amp; Outreach Channel:</label>
+                    <select
+                      value={campaignForm.channel}
+                      onChange={(e) => setCampaignForm(prev => ({ ...prev, channel: e.target.value }))}
+                      style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="Loudspeaker PA Van & SMS Alert">Loudspeaker PA Van & SMS Alert</option>
+                      <option value="Door-to-Door Relief Volunteer Drill">Door-to-Door Relief Volunteer Drill</option>
+                      <option value="WhatsApp Community Flood Advisory">WhatsApp Community Flood Advisory</option>
+                      <option value="Siren Testing & Shelter Walkthrough">Siren Testing & Shelter Walkthrough</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                  <button
+                    onClick={() => setIsCampaignModalOpen(false)}
+                    style={{ padding: '7px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '12px', cursor: 'pointer' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!campaignForm.title.trim()) {
+                        setCampaignFormError('Please provide a campaign title.');
+                        return;
+                      }
+                      scheduleAwarenessCampaign(campaignForm);
+                      setIsCampaignModalOpen(false);
+                    }}
+                    style={{ padding: '7px 16px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'var(--gov-blue-700)', color: '#FFFFFF', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Confirm &amp; Schedule
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1672,6 +2176,48 @@ export default function DashboardPage() {
           flexDirection: 'column',
           gap: '20px'
         }}>
+          {/* Network Outage & LoRa Fallback Status Banner */}
+          <div style={{
+            background: isOutageActive ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.1)',
+            border: `1px solid ${isOutageActive ? 'rgba(239, 68, 68, 0.35)' : 'rgba(16, 185, 129, 0.3)'}`,
+            borderLeft: `5px solid ${isOutageActive ? '#EF4444' : '#10B981'}`,
+            borderRadius: 'var(--radius-md)',
+            padding: '14px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '14px', color: isOutageActive ? '#EF4444' : '#10B981', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isOutageActive ? <Radio size={16} /> : <CheckCircle2 size={16} />}
+                <span>{isOutageActive ? 'OUTAGE ACTIVE: LoRa Mesh Fallback Engaged' : 'Primary Cellular Network Operational'}</span>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                {isOutageActive
+                  ? 'Simulated cellular blackout active. All drain telemetry sensors have fallen back to sub-GHz LoRa mesh radio.'
+                  : 'Cellular 4G IoT backhaul connected. Sub-GHz LoRa mesh transceivers in hot-standby for emergency failover.'}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={toggleNetworkOutage}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-sm)',
+                border: 'none',
+                background: isOutageActive ? '#10B981' : '#EF4444',
+                color: '#FFFFFF',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              {isOutageActive ? 'Restore Cellular Network' : '⚡ Simulate Network Outage'}
+            </button>
+          </div>
+
           {/* Header Card */}
           <div style={{
             background: 'var(--bg-card)',
@@ -1885,21 +2431,23 @@ export default function DashboardPage() {
                 <thead>
                   <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase' }}>
                     <th style={{ padding: '10px 14px' }}>Node ID &amp; Location</th>
+                    <th style={{ padding: '10px 14px' }}>Comms Status</th>
                     <th style={{ padding: '10px 14px' }}>Link Quality</th>
-                    <th style={{ padding: '10px 14px' }}>RSSI</th>
-                    <th style={{ padding: '10px 14px' }}>SNR</th>
-                    <th style={{ padding: '10px 14px' }}>Spreading Factor</th>
+                    <th style={{ padding: '10px 14px' }}>Signal Strength (RSSI)</th>
                     <th style={{ padding: '10px 14px' }}>Battery</th>
-                    <th style={{ padding: '10px 14px' }}>Success Rate</th>
-                    <th style={{ padding: '10px 14px' }}>Last Uplink</th>
+                    <th style={{ padding: '10px 14px' }}>Protocol</th>
+                    <th style={{ padding: '10px 14px' }}>Last Seen</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(loraData?.nodes || DRAIN_NODES).map(node => {
-                    const isLost = node.linkQuality === 'LOST';
-                    const isWeak = node.linkQuality === 'WEAK';
-                    const linkColor = isLost ? '#EF4444' : isWeak ? '#F59E0B' : '#10B981';
-                    const linkBg = isLost ? 'rgba(239, 68, 68, 0.15)' : isWeak ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)';
+                  {(drainNodes || []).map(node => {
+                    const loraNode = loraData?.nodes?.find(n => n.id === node.id);
+                    const isLost = loraNode?.linkQuality === 'LOST' || node.commsStatus === 'OFFLINE';
+                    const isLoRa = isOutageActive || node.commsStatus === 'LORA_FALLBACK';
+                    
+                    const commsLabel = isOutageActive ? 'LoRa Fallback' : (node.commsStatus || 'Online');
+                    const commsColor = isLost ? '#EF4444' : isLoRa ? '#F59E0B' : '#10B981';
+                    const commsBg = isLost ? 'rgba(239, 68, 68, 0.15)' : isLoRa ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)';
 
                     return (
                       <tr key={node.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
@@ -1909,39 +2457,49 @@ export default function DashboardPage() {
                         </td>
                         <td style={{ padding: '10px 14px' }}>
                           <span style={{
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            background: commsBg,
+                            color: commsColor,
+                            border: `1px solid ${commsColor}40`,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            {isLoRa ? <Radio size={12} /> : <Wifi size={12} />}
+                            {commsLabel}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <span style={{
                             fontSize: '10px',
                             fontWeight: 800,
                             padding: '2px 8px',
                             borderRadius: '4px',
-                            background: linkBg,
-                            color: linkColor,
-                            border: `1px solid ${linkColor}40`
+                            background: isLost ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                            color: isLost ? '#EF4444' : '#10B981'
                           }}>
-                            {node.linkQuality || 'GOOD'}
+                            {loraNode?.linkQuality || node.linkQuality || 'GOOD'}
                           </span>
                         </td>
                         <td style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)' }}>
-                          <strong>{node.rssiDbm ?? -92} dBm</strong>
-                        </td>
-                        <td style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)' }}>
-                          {node.snrDb ? `${node.snrDb > 0 ? '+' : ''}${node.snrDb} dB` : '+6.5 dB'}
-                        </td>
-                        <td style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)' }}>
-                          <span style={{ background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
-                            {node.spreadingFactor || 'SF7'} (ADR)
-                          </span>
+                          <strong>{loraNode?.rssiDbm ?? node.rssiDbm ?? -78} dBm</strong>
                         </td>
                         <td style={{ padding: '10px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <Battery size={13} color="var(--status-normal)" />
-                            <span style={{ fontFamily: 'var(--font-mono)' }}>{node.batteryPct ?? 92}%</span>
+                            <span style={{ fontFamily: 'var(--font-mono)' }}>{node.battery ?? 95}%</span>
                           </div>
                         </td>
                         <td style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)' }}>
-                          {node.successRatePct ?? 98.5}%
+                          <span style={{ background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-light)', fontSize: '11px' }}>
+                            {isLoRa ? 'Sub-GHz (866 MHz)' : 'Cellular 4G/LTE-M'}
+                          </span>
                         </td>
-                        <td style={{ padding: '10px 14px', color: 'var(--text-muted)' }}>
-                          {node.lastUplinkSec ? `${Math.round(node.lastUplinkSec)}s ago` : '8s ago'}
+                        <td style={{ padding: '10px 14px', color: 'var(--text-muted)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                          {node.lastSeen || 'Just now'}
                         </td>
                       </tr>
                     );
@@ -2091,6 +2649,195 @@ export default function DashboardPage() {
                 )}
               </div>
             </div>
+
+            {/* Emergency LoRa Broadcast Alert Queue */}
+            <div style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-light)',
+              borderRadius: 'var(--radius-md)',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              marginTop: '8px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <h4 style={{ fontSize: '14px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Radio size={14} color="var(--gov-blue-700)" />
+                    <span>Emergency LoRa Broadcast Queue ({loraQueue?.length || 0})</span>
+                  </h4>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                    Sub-GHz 865-867 MHz out-of-band emergency broadcast packets for cellular blackout regions.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsLoRaQueueModalOpen(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--gov-blue-700)',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Plus size={13} />
+                  <span>Queue Emergency LoRa Alert</span>
+                </button>
+              </div>
+
+              {/* LoRa Queue Table */}
+              <div style={{ overflowX: 'auto', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '8px 12px' }}>Packet ID</th>
+                      <th style={{ padding: '8px 12px' }}>Target Zone</th>
+                      <th style={{ padding: '8px 12px' }}>Emergency Broadcast Content</th>
+                      <th style={{ padding: '8px 12px' }}>Comms Status</th>
+                      <th style={{ padding: '8px 12px' }}>Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(loraQueue || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={5} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                          No pending packets in LoRa emergency transmission buffer.
+                        </td>
+                      </tr>
+                    ) : (
+                      loraQueue.map(item => (
+                        <tr key={item.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                          <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                            {item.id}
+                          </td>
+                          <td style={{ padding: '8px 12px', fontWeight: 600 }}>
+                            {item.payload?.zone || item.zone || 'Catchment Basin'}
+                          </td>
+                          <td style={{ padding: '8px 12px', maxWidth: '320px' }}>
+                            {item.payload?.message || item.message || 'Emergency inundation broadcast.'}
+                          </td>
+                          <td style={{ padding: '8px 12px' }}>
+                            <span style={{
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              padding: '2px 6px',
+                              borderRadius: '3px',
+                              background: 'rgba(16, 185, 129, 0.15)',
+                              color: '#10B981',
+                              border: '1px solid rgba(16, 185, 129, 0.3)'
+                            }}>
+                              {item.status === 'SENT_VIA_LORA' ? 'SENT VIA LORA' : (item.status || 'QUEUED')}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                            {item.timestamp}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Queue Emergency Alert Modal */}
+            {isLoRaQueueModalOpen && (
+              <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.7)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+                padding: '16px'
+              }}>
+                <div style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-medium)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '24px',
+                  maxWidth: '460px',
+                  width: '100%',
+                  boxShadow: 'var(--shadow-lg)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Radio size={16} color="var(--gov-blue-700)" />
+                      <span>Queue Emergency Broadcast Packet</span>
+                    </h3>
+                    <button
+                      onClick={() => setIsLoRaQueueModalOpen(false)}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div>
+                      <label style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>Target Catchment / Zone:</label>
+                      <input
+                        type="text"
+                        value={loraQueueForm.zone}
+                        onChange={(e) => setLoraQueueForm(prev => ({ ...prev, zone: e.target.value }))}
+                        style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontWeight: 700, display: 'block', marginBottom: '4px' }}>LoRa Emergency Packet Message (Max 120 chars):</label>
+                      <textarea
+                        rows={3}
+                        maxLength={120}
+                        value={loraQueueForm.message}
+                        onChange={(e) => setLoraQueueForm(prev => ({ ...prev, message: e.target.value }))}
+                        style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', resize: 'none' }}
+                      />
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', textAlign: 'right', marginTop: '2px' }}>
+                        {loraQueueForm.message.length} / 120 chars (Optimized for Sub-GHz ISM Band)
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                    <button
+                      onClick={() => setIsLoRaQueueModalOpen(false)}
+                      style={{ padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '12px', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (loraQueueForm.message.trim()) {
+                          queueLoRaAlert(loraQueueForm);
+                          setIsLoRaQueueModalOpen(false);
+                        }
+                      }}
+                      style={{ padding: '6px 14px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'var(--gov-blue-700)', color: '#FFFFFF', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Transmit via LoRa &rarr;
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
           </div>
         </div>
@@ -2514,7 +3261,7 @@ export default function DashboardPage() {
           background: 'rgba(15, 23, 42, 0.95)',
           color: '#FFFFFF',
           border: '1px solid rgba(16, 185, 129, 0.4)',
-          borderLeft: '4px solid #10B981',
+          borderLeft: `4px solid ${toast?.type === 'error' ? '#EF4444' : '#10B981'}`,
           padding: '12px 18px',
           borderRadius: 'var(--radius-md)',
           boxShadow: 'var(--shadow-lg)',
@@ -2525,8 +3272,12 @@ export default function DashboardPage() {
           fontWeight: 600,
           animation: 'slideUp 0.2s ease-out'
         }}>
-          <CheckCircle2 size={16} color="#10B981" />
-          <span>{toast}</span>
+          {toast?.type === 'error' ? (
+            <AlertTriangle size={16} color="#EF4444" />
+          ) : (
+            <CheckCircle2 size={16} color="#10B981" />
+          )}
+          <span>{typeof toast === 'string' ? toast : toast?.message}</span>
           <span style={{ fontSize: '9px', fontWeight: 800, color: '#3B82F6', background: 'rgba(59, 130, 246, 0.15)', padding: '1px 5px', borderRadius: '3px', marginLeft: '6px' }}>
             [SIMULATED]
           </span>

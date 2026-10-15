@@ -40,6 +40,15 @@ import {
 
 export default function FloodAlertCenter({ drainNodes = [], forecastRainfall = 48 }) {
   const {
+    floodAlerts,
+    rescueTeams,
+    assignTeamToAlert,
+    reassignUnit,
+    markTeamOnScene,
+    markAlertResolved,
+    acknowledgeAlert,
+    sendPublicAlertForInundation,
+    showToast,
     broadcastHistory,
     lastDispatchedBroadcast,
     dispatchCitizenBroadcast,
@@ -47,6 +56,36 @@ export default function FloodAlertCenter({ drainNodes = [], forecastRainfall = 4
     alertPrefillParams,
     setAlertPrefillParams
   } = useFloodGuard();
+
+  // Tab 3 Alert Incident Center States
+  const [alertSeverityFilter, setAlertSeverityFilter] = useState('ALL');
+  const [alertStatusFilter, setAlertStatusFilter] = useState('ALL');
+  const [alertSearchTerm, setAlertSearchTerm] = useState('');
+  const [assignModalAlert, setAssignModalAlert] = useState(null);
+  const [manualTeamSelect, setManualTeamSelect] = useState('');
+  const [reassignModalAlert, setReassignModalAlert] = useState(null);
+  const [reassignTeamSelect, setReassignTeamSelect] = useState('');
+
+  const availableRescueTeams = useMemo(() => {
+    return (rescueTeams || []).filter(t => 
+      (t.type === 'RESCUE' || !t.type) && (t.status === 'AVAILABLE' || t.status === 'STANDBY')
+    );
+  }, [rescueTeams]);
+
+  const filteredFloodAlerts = useMemo(() => {
+    return (floodAlerts || []).filter(alert => {
+      if (alertSeverityFilter !== 'ALL' && alert.severity !== alertSeverityFilter) return false;
+      if (alertStatusFilter !== 'ALL' && alert.status !== alertStatusFilter) return false;
+      if (alertSearchTerm.trim()) {
+        const term = alertSearchTerm.toLowerCase();
+        const matchesZone = alert.zone?.toLowerCase().includes(term);
+        const matchesTitle = alert.title?.toLowerCase().includes(term);
+        const matchesId = alert.id?.toLowerCase().includes(term);
+        if (!matchesZone && !matchesTitle && !matchesId) return false;
+      }
+      return true;
+    });
+  }, [floodAlerts, alertSeverityFilter, alertStatusFilter, alertSearchTerm]);
 
   // Alert level selection (WATCH | WARNING | DANGER | ALL_CLEAR)
   const [selectedLevel, setSelectedLevel] = useState('DANGER');
@@ -322,6 +361,675 @@ export default function FloodAlertCenter({ drainNodes = [], forecastRainfall = 4
             <span>National Disaster Cell &bull; Helpline: <strong>1070</strong></span>
           </div>
         </div>
+      </div>
+
+      {/* =========================================================================
+          TAB 3 REQUIREMENT: MUNICIPAL FLOOD ALERTS & INCIDENT RESPONSE CENTER
+         ========================================================================= */}
+      <div style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-medium)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '22px',
+        boxShadow: 'var(--shadow-sm)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px'
+      }}>
+        {/* Section Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertOctagon size={20} color="#EF4444" />
+              <h3 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                Active Flood Incidents &amp; Team Dispatch
+              </h3>
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 800,
+                padding: '2px 8px',
+                borderRadius: '999px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                color: '#EF4444',
+                border: '1px solid rgba(239, 68, 68, 0.3)'
+              }}>
+                {filteredFloodAlerts.length} Incidents
+              </span>
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+              Live emergency telemetry alerts. Assign rescue teams, verify on-scene progression, broadcast citizen alerts, or mark resolved.
+            </p>
+          </div>
+
+          <span style={{ fontSize: '10px', fontWeight: 800, color: '#3B82F6', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+            [SIMULATED DISPATCH]
+          </span>
+        </div>
+
+        {/* Filters and Search Bar */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '10px',
+          background: 'var(--bg-secondary)',
+          padding: '12px 14px',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border-light)'
+        }}>
+          {/* Search */}
+          <div style={{ flex: '1 1 240px', minWidth: '200px' }}>
+            <input
+              type="text"
+              placeholder="Search alerts by zone, ID, or description..."
+              value={alertSearchTerm}
+              onChange={(e) => setAlertSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '7px 12px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border-medium)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: '12px',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          {/* Severity Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>Severity:</span>
+            {['ALL', 'CRITICAL', 'WARNING'].map(sev => (
+              <button
+                key={sev}
+                type="button"
+                onClick={() => setAlertSeverityFilter(sev)}
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '4px 8px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid',
+                  borderColor: alertSeverityFilter === sev ? 'var(--gov-blue-700)' : 'var(--border-medium)',
+                  background: alertSeverityFilter === sev ? 'var(--gov-blue-700)' : 'var(--bg-primary)',
+                  color: alertSeverityFilter === sev ? '#FFFFFF' : 'var(--text-secondary)',
+                  cursor: 'pointer'
+                }}
+              >
+                {sev}
+              </button>
+            ))}
+          </div>
+
+          {/* Status Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>Status:</span>
+            {['ALL', 'NEW', 'ASSIGNED', 'ON SCENE', 'RESOLVED'].map(st => (
+              <button
+                key={st}
+                type="button"
+                onClick={() => setAlertStatusFilter(st)}
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '4px 8px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid',
+                  borderColor: alertStatusFilter === st ? 'var(--gov-blue-700)' : 'var(--border-medium)',
+                  background: alertStatusFilter === st ? 'var(--gov-blue-700)' : 'var(--bg-primary)',
+                  color: alertStatusFilter === st ? '#FFFFFF' : 'var(--text-secondary)',
+                  cursor: 'pointer'
+                }}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Flood Alert Cards List */}
+        {filteredFloodAlerts.length === 0 ? (
+          <div style={{
+            padding: '36px',
+            textAlign: 'center',
+            background: 'var(--bg-secondary)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px dashed var(--border-medium)',
+            color: 'var(--text-muted)',
+            fontSize: '13px'
+          }}>
+            No active flood alerts matching the specified criteria.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {filteredFloodAlerts.map(alert => {
+              const isCritical = alert.severity === 'CRITICAL';
+              const isResolved = alert.status === 'RESOLVED';
+              const isOnScene = alert.status === 'ON SCENE';
+              const isAssigned = alert.status === 'ASSIGNED';
+              const isNew = alert.status === 'NEW';
+
+              const cardBorder = isResolved
+                ? '#10B981'
+                : isCritical
+                ? '#EF4444'
+                : '#F59E0B';
+
+              const assignedTeam = rescueTeams.find(t => t.id === alert.assignedTeamId);
+
+              return (
+                <div
+                  key={alert.id}
+                  style={{
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-medium)',
+                    borderLeft: `5px solid ${cardBorder}`,
+                    borderRadius: 'var(--radius-md)',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px'
+                  }}
+                >
+                  {/* Top line: Title, ID, Time, Badges */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+                          {alert.id}
+                        </span>
+                        <h4 style={{ fontSize: '15px', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                          {alert.title}
+                        </h4>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <MapPin size={13} color="var(--gov-blue-700)" />
+                        <strong>{alert.zone}</strong> &bull; Reported: {alert.timestamp || 'Recent'}
+                      </div>
+                    </div>
+
+                    {/* Badges strip */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      {/* Severity badge */}
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        background: isCritical ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                        color: isCritical ? '#EF4444' : '#F59E0B',
+                        border: `1px solid ${isCritical ? 'rgba(239, 68, 68, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`
+                      }}>
+                        {alert.severity}
+                      </span>
+
+                      {/* Status badge */}
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        background: isResolved ? 'rgba(16, 185, 129, 0.15)' : isOnScene ? 'rgba(239, 68, 68, 0.15)' : isAssigned ? 'rgba(59, 130, 246, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                        color: isResolved ? '#10B981' : isOnScene ? '#EF4444' : isAssigned ? '#3B82F6' : '#F59E0B',
+                        border: '1px solid currentColor'
+                      }}>
+                        {alert.status}
+                      </span>
+
+                      {/* Public notified badge */}
+                      {alert.citizenNotified && (
+                        <span style={{
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          background: 'rgba(59, 130, 246, 0.15)',
+                          color: '#3B82F6',
+                          border: '1px solid rgba(59, 130, 246, 0.35)'
+                        }}>
+                          📢 Public Notified
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Telemetry and Reason details */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: '8px',
+                    background: 'var(--bg-primary)',
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-light)',
+                    fontSize: '12px'
+                  }}>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Water Stage: </span>
+                      <strong style={{ fontFamily: 'var(--font-mono)', color: isCritical ? '#EF4444' : 'var(--text-primary)' }}>
+                        {alert.waterLevel}
+                      </strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Precipitation: </span>
+                      <strong style={{ fontFamily: 'var(--font-mono)' }}>{alert.rainfall}</strong>
+                    </div>
+                    <div style={{ gridColumn: '1 / -1', color: 'var(--text-secondary)' }}>
+                      <strong>Risk Diagnosis:</strong> {alert.riskReason}
+                    </div>
+                  </div>
+
+                  {/* Assigned Unit Status Card */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    background: assignedTeam ? 'rgba(59, 130, 246, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: `1px solid ${assignedTeam ? 'rgba(59, 130, 246, 0.25)' : 'rgba(245, 158, 11, 0.25)'}`,
+                    fontSize: '12px'
+                  }}>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Assigned Rescue Unit: </span>
+                      <strong style={{ color: assignedTeam ? '#3B82F6' : '#F59E0B' }}>
+                        {alert.assignedTeamName ? `${alert.assignedTeamName} (${alert.assignedTeamId})` : 'Unassigned — Needs Emergency Dispatch'}
+                      </strong>
+                      {assignedTeam && (
+                        <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                          Status: <strong>{assignedTeam.status}</strong> &bull; Workload: <strong>{assignedTeam.workload || 1} tasks</strong>
+                        </span>
+                      )}
+                    </div>
+                    {alert.assignedAt && (
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        Dispatched: {alert.assignedAt}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Action Buttons Bar */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    flexWrap: 'wrap',
+                    paddingTop: '6px',
+                    borderTop: '1px solid var(--border-light)'
+                  }}>
+                    {/* 1. Assign Team */}
+                    {!isResolved && !alert.assignedTeamId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAssignModalAlert(alert);
+                          setManualTeamSelect('');
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'var(--gov-blue-700)',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Assign Team
+                      </button>
+                    )}
+
+                    {/* 2. Reassign Team */}
+                    {!isResolved && alert.assignedTeamId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReassignModalAlert(alert);
+                          setReassignTeamSelect('');
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'var(--bg-primary)',
+                          border: '1px solid var(--border-medium)',
+                          color: 'var(--text-primary)',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Reassign Team
+                      </button>
+                    )}
+
+                    {/* 3. Acknowledge */}
+                    {isNew && (
+                      <button
+                        type="button"
+                        onClick={() => acknowledgeAlert(alert.id)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'rgba(245, 158, 11, 0.15)',
+                          border: '1px solid rgba(245, 158, 11, 0.4)',
+                          color: '#F59E0B',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Acknowledge
+                      </button>
+                    )}
+
+                    {/* 4. Mark On Scene */}
+                    {!isResolved && (isAssigned || alert.assignedTeamId) && !isOnScene && (
+                      <button
+                        type="button"
+                        onClick={() => markTeamOnScene(alert.id)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'rgba(59, 130, 246, 0.15)',
+                          border: '1px solid rgba(59, 130, 246, 0.4)',
+                          color: '#3B82F6',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Mark On Scene
+                      </button>
+                    )}
+
+                    {/* 5. Mark Resolved */}
+                    {!isResolved && (
+                      <button
+                        type="button"
+                        onClick={() => markAlertResolved(alert.id)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'rgba(16, 185, 129, 0.15)',
+                          border: '1px solid rgba(16, 185, 129, 0.4)',
+                          color: '#10B981',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Mark Resolved
+                      </button>
+                    )}
+
+                    {/* 6. Send Public Alert */}
+                    <button
+                      type="button"
+                      onClick={() => sendPublicAlertForInundation(alert.id)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.35)',
+                        color: '#EF4444',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        marginLeft: 'auto'
+                      }}
+                    >
+                      Send Public Alert
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ASSIGN RESCUE TEAM MODAL */}
+        {assignModalAlert && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '16px'
+          }}>
+            <div style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-medium)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '24px',
+              maxWidth: '520px',
+              width: '100%',
+              boxShadow: 'var(--shadow-xl)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div>
+                <h4 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                  Assign Rescue Unit to Alert
+                </h4>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  {assignModalAlert.id}: {assignModalAlert.title} ({assignModalAlert.zone})
+                </p>
+              </div>
+
+              {availableRescueTeams.length === 0 ? (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  padding: '12px',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#EF4444',
+                  fontSize: '13px',
+                  fontWeight: 600
+                }}>
+                  ⚠️ No rescue teams are currently free! All rescue units are dispatched or on scene. Free a team by marking an existing incident resolved or recall a unit.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                    Select Rescue Unit:
+                  </label>
+                  <select
+                    value={manualTeamSelect}
+                    onChange={(e) => setManualTeamSelect(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-medium)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <option value="">⚡ Auto-assign best available team (nearest &amp; free)</option>
+                    {availableRescueTeams.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} — {t.role} ({t.zone}) &bull; {t.personnel} crew, {t.boats} boats
+                      </option>
+                    ))}
+                  </select>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
+                    Auto-assignment picks the closest standing rescue unit to {assignModalAlert.zone} and sets status to Dispatched.
+                  </p>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setAssignModalAlert(null)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-secondary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={availableRescueTeams.length === 0}
+                  onClick={() => {
+                    assignTeamToAlert(assignModalAlert.id, manualTeamSelect || null);
+                    setAssignModalAlert(null);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: availableRescueTeams.length === 0 ? 'var(--text-muted)' : 'var(--gov-blue-700)',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: availableRescueTeams.length === 0 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  Confirm Dispatch
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* REASSIGN RESCUE TEAM MODAL */}
+        {reassignModalAlert && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '16px'
+          }}>
+            <div style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-medium)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '24px',
+              maxWidth: '520px',
+              width: '100%',
+              boxShadow: 'var(--shadow-xl)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div>
+                <h4 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                  Reassign Emergency Response Team
+                </h4>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  Currently assigned: <strong>{reassignModalAlert.assignedTeamName || reassignModalAlert.assignedTeamId}</strong>
+                </p>
+              </div>
+
+              {availableRescueTeams.length === 0 ? (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  padding: '12px',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#EF4444',
+                  fontSize: '13px',
+                  fontWeight: 600
+                }}>
+                  ⚠️ No replacement rescue teams currently free!
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                    Select Replacement Rescue Unit:
+                  </label>
+                  <select
+                    value={reassignTeamSelect}
+                    onChange={(e) => setReassignTeamSelect(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-medium)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <option value="">Select a free rescue team...</option>
+                    {availableRescueTeams.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} — {t.role} ({t.zone}) &bull; {t.personnel} crew
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setReassignModalAlert(null)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-secondary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!reassignTeamSelect}
+                  onClick={() => {
+                    reassignUnit(reassignModalAlert.id, reassignTeamSelect, 'ALERT');
+                    setReassignModalAlert(null);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: !reassignTeamSelect ? 'var(--text-muted)' : 'var(--gov-blue-700)',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: !reassignTeamSelect ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  Confirm Reassignment
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* =========================================================================
