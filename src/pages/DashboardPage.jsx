@@ -38,6 +38,7 @@ import MaintenanceModule from '../components/MaintenanceModule';
 import { MaintenanceSimulationService } from '../services/maintenanceSim';
 import FloodAlertCenter from '../components/FloodAlertCenter';
 import MultiAgentCoordinatorPanel from '../components/MultiAgentCoordinatorPanel';
+import HardwareHighlight from '../components/HardwareHighlight';
 
 const SHIPMENT_PROOFS = [
   {
@@ -3573,6 +3574,9 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Hardware Protection Highlight Section (Bottom of Dashboard, above footer) */}
+      <HardwareHighlight />
 
     </div>
   );

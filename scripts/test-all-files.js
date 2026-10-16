@@ -170,7 +170,8 @@ const componentFiles = [
   'MaintenanceModule.jsx',
   'OverviewCardDrawer.jsx',
   'GisMiniMap.jsx',
-  'LoginForm.jsx'
+  'LoginForm.jsx',
+  'HardwareHighlight.jsx'
 ];
 
 for (const comp of componentFiles) {
@@ -182,6 +183,29 @@ for (const comp of componentFiles) {
     assert(content.length > 500, `Component ${comp} is populated (${content.length} bytes)`);
   }
 }
+
+// Hardware Protection Section verification
+try {
+  const hwRaw = fs.readFileSync(path.resolve('./src/components/HardwareHighlight.jsx'), 'utf8');
+  assert(hwRaw.includes('Built to Survive the Drain'), 'HardwareHighlight has exact title');
+  assert(hwRaw.includes('Rugged, waterproof hardware protected by a strong grid guard'), 'HardwareHighlight has exact subtitle');
+  assert(hwRaw.includes('Strong Grid Guard'), 'Card 1: Strong Grid Guard present');
+  assert(hwRaw.includes('Stays Firmly in Place'), 'Card 2: Stays Firmly in Place present');
+  assert(hwRaw.includes('Waterproof, High-Quality Build'), 'Card 3: Waterproof, High-Quality Build present');
+  assert(hwRaw.includes('Debris-resistant') && hwRaw.includes('Waterproof design') && hwRaw.includes('Durable materials'), 'All 3 tag chips present');
+  assert(hwRaw.includes('sensor-hardware.jpg'), 'References sensor-hardware.jpg');
+  assert(hwRaw.includes('NOTE: TECHNICAL SPECIFICATIONS PLACEHOLDER'), 'Clear comment placeholder for future technical specifications');
+  assert(hwRaw.includes('hardware-highlight-section'), 'Includes hardware-highlight-section class with responsive styling');
+
+  const dashRaw = fs.readFileSync(path.resolve('./src/pages/DashboardPage.jsx'), 'utf8');
+  assert(dashRaw.includes('<HardwareHighlight'), 'DashboardPage mounts HardwareHighlight section at bottom');
+
+  const pubRaw = fs.readFileSync(path.resolve('./src/pages/PublicAlertsPage.jsx'), 'utf8');
+  assert(pubRaw.includes('<HardwareHighlight'), 'PublicAlertsPage mounts HardwareHighlight section');
+} catch (err) {
+  assert(false, `HardwareHighlight tests failed: ${err.message}`);
+}
+
 
 // 7. TEST SMART DRAIN MONITOR SIMULATION ENGINE
 console.log('\n>>> [7/8] Testing Smart Drain Simulation Engine (smart-drain-monitor/)...');

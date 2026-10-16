@@ -18,6 +18,7 @@ import {
   Radio
 } from 'lucide-react';
 import { useFloodGuard } from '../context/FloodGuardStore';
+import HardwareHighlight from '../components/HardwareHighlight';
 
 const BASE_PUBLIC_ALERTS = [
   {
@@ -452,6 +453,9 @@ export default function PublicAlertsPage({ onBackToLogin }) {
           </div>
         </div>
       </div>
+
+      {/* Hardware Protection Highlight Section */}
+      <HardwareHighlight />
     </div>
   );
 }
