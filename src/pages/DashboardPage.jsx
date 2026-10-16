@@ -152,6 +152,9 @@ export default function DashboardPage() {
   // Interactive UI State for Overlays
   const [activeZoneModal, setActiveZoneModal] = useState(null);
   const [reassignTeamModal, setReassignTeamModal] = useState(null);
+  const [dispatchModalTeam, setDispatchModalTeam] = useState(null);
+  const [dispatchZoneTarget, setDispatchZoneTarget] = useState('Urban Culvert Line C-8 (Ward 14)');
+  const [onSceneReassignConfirmed, setOnSceneReassignConfirmed] = useState(false);
   const [selectedZoneTeam, setSelectedZoneTeam] = useState('');
   const [selectedZoneCamp, setSelectedZoneCamp] = useState('');
   const [newReassignZone, setNewReassignZone] = useState('');
@@ -1668,14 +1671,17 @@ export default function DashboardPage() {
                     </div>
 
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      Personnel: <strong>{team.personnel}</strong> &bull; Equipment: {team.boats ? `${team.boats} Inflatable Boats` : `${team.ambulances || 1} Ambulances`}
+                      Personnel: <strong>{team.personnel}</strong> &bull; Equipment: <strong>{team.equipment || (team.type === 'MEDICAL' ? `${team.ambulances || 2} Critical Care Ambulances` : (team.boats ? `${team.boats} Inflatable Boats` : 'Specialized Municipal Rig'))}</strong>
                     </div>
 
                     {/* Action buttons with live simulated state machine */}
                     <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
                       {isStandbyOrAvail && (
                         <button
-                          onClick={() => dispatchRescueTeam(team.id, team.zone || 'Critical Risk Basin', 10)}
+                          onClick={() => {
+                            setDispatchModalTeam(team);
+                            setDispatchZoneTarget(team.zone || 'Urban Culvert Line C-8 (Ward 14)');
+                          }}
                           style={{
                             padding: '4px 10px',
                             background: 'var(--gov-blue-700)',
@@ -1711,7 +1717,8 @@ export default function DashboardPage() {
                           <button
                             onClick={() => {
                               setReassignTeamModal(team);
-                              setNewReassignZone(team.zone || '');
+                              setNewReassignZone(team.zone || 'Ward 14 (Industrial Area Basin)');
+                              setOnSceneReassignConfirmed(false);
                             }}
                             style={{
                               padding: '4px 8px',
@@ -3190,6 +3197,138 @@ export default function DashboardPage() {
       )}
 
       {/* =========================================================================
+          DISPATCH RESCUE / DRAINAGE TEAM MODAL (PART 4)
+         ========================================================================= */}
+      {dispatchModalTeam && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-medium)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '24px',
+            maxWidth: '460px',
+            width: '100%',
+            boxShadow: 'var(--shadow-lg)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                Dispatch {dispatchModalTeam.name}
+              </h3>
+              <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(13, 148, 136, 0.15)', color: '#0D9488' }}>
+                {dispatchModalTeam.type}
+              </span>
+            </div>
+
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Equipment Payload: <strong>{dispatchModalTeam.equipment}</strong>
+            </div>
+
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: 700, display: 'block', marginBottom: '6px' }}>
+                Select Target Municipal Risk Zone:
+              </label>
+              <select
+                value={dispatchZoneTarget}
+                onChange={(e) => setDispatchZoneTarget(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-medium)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '12px',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                <option value="Urban Culvert Line C-8 (Ward 14)">Urban Culvert Line C-8 (Ward 14)</option>
+                <option value="River Basin Weir Gate (Ward 4)">River Basin Weir Gate (Ward 4)</option>
+                <option value="Market Road Arterial Storm Drain (Ward 9)">Market Road Arterial Storm Drain (Ward 9)</option>
+                <option value="Central Underpass Pumping Sump (Ward 11)">Central Underpass Pumping Sump (Ward 11)</option>
+                <option value="Metro Rail Viaduct Storm Trench (Ward 4)">Metro Rail Viaduct Storm Trench (Ward 4)</option>
+              </select>
+            </div>
+
+            {/* Equipment & Incident Matching Check */}
+            <div style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-light)',
+              borderRadius: '6px',
+              padding: '10px',
+              fontSize: '11px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Estimated Rapid Response Transit:</span>
+                <strong style={{ color: 'var(--gov-blue-700)', fontFamily: 'var(--font-mono)' }}>
+                  {dispatchZoneTarget.includes('Ward 14') ? '5 mins' : (dispatchZoneTarget.includes('Ward 4') ? '4 mins' : '7 mins')}
+                </strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Capability Fit:</span>
+                <span style={{ color: '#10B981', fontWeight: 700 }}>
+                  {dispatchModalTeam.type === 'CLEANING' ? '✅ Specialized Drainage Equipment' : '✅ Floodwater Evacuation Certified'}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '6px' }}>
+              <button
+                onClick={() => setDispatchModalTeam(null)}
+                style={{
+                  padding: '6px 14px',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-medium)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const calculatedEta = dispatchZoneTarget.includes('Ward 14') ? 5 : (dispatchZoneTarget.includes('Ward 4') ? 4 : 7);
+                  dispatchRescueTeam(dispatchModalTeam.id, dispatchZoneTarget, calculatedEta);
+                  setDispatchModalTeam(null);
+                }}
+                style={{
+                  padding: '6px 14px',
+                  background: 'var(--gov-blue-700)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Confirm Dispatch
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
           REASSIGN RESCUE TEAM MODAL
          ========================================================================= */}
       {reassignTeamModal && (
@@ -3223,8 +3362,23 @@ export default function DashboardPage() {
               Reassign {reassignTeamModal.name}
             </h3>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
-              Current Area: <strong>{reassignTeamModal.zone}</strong>
+              Current Area: <strong>{reassignTeamModal.zone}</strong> &bull; Status: <strong>{reassignTeamModal.status}</strong>
             </p>
+
+            {reassignTeamModal.status === 'ON SCENE' && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', borderRadius: '6px', padding: '10px', fontSize: '11px', color: '#EF4444' }}>
+                <div style={{ fontWeight: 800, marginBottom: '4px' }}>⚠️ UNIT IS CURRENTLY ON SCENE</div>
+                <div>This unit is actively engaged in on-scene operations. Reassignment will pull them from their live post.</div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', cursor: 'pointer', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  <input
+                    type="checkbox"
+                    checked={onSceneReassignConfirmed}
+                    onChange={(e) => setOnSceneReassignConfirmed(e.target.checked)}
+                  />
+                  I confirm pulling and reassigning this On-Scene unit
+                </label>
+              </div>
+            )}
 
             <div>
               <label style={{ fontSize: '11px', fontWeight: 700, display: 'block', marginBottom: '6px' }}>
@@ -3268,19 +3422,20 @@ export default function DashboardPage() {
                 Cancel
               </button>
               <button
+                disabled={reassignTeamModal.status === 'ON SCENE' && !onSceneReassignConfirmed}
                 onClick={() => {
                   reassignRescueTeam(reassignTeamModal.id, newReassignZone);
                   setReassignTeamModal(null);
                 }}
                 style={{
                   padding: '6px 14px',
-                  background: 'var(--gov-blue-700)',
+                  background: (reassignTeamModal.status === 'ON SCENE' && !onSceneReassignConfirmed) ? 'var(--text-muted)' : 'var(--gov-blue-700)',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: 'var(--radius-sm)',
                   fontSize: '12px',
                   fontWeight: 700,
-                  cursor: 'pointer'
+                  cursor: (reassignTeamModal.status === 'ON SCENE' && !onSceneReassignConfirmed) ? 'not-allowed' : 'pointer'
                 }}
               >
                 Confirm Reassignment

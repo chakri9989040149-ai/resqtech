@@ -45,6 +45,8 @@ export default function MultiAgentCoordinatorPanel() {
     floodAlerts = [],
     drainNodes = [],
     rescueTeams = [],
+    reliefCamps = [],
+    riskZones = [],
     loraQueue = [],
     activityLog = [],
     assignTeamToAlert,
@@ -52,6 +54,11 @@ export default function MultiAgentCoordinatorPanel() {
     restorePrimarySensor,
     addActivity,
     resetDemoData,
+    preEvacuateShelter,
+    dispatchInspectionCrew,
+    animateDrainClearing,
+    scheduleAwarenessCampaign,
+    cycleTeamStatus,
     triggerHeavyRainSurgeScenario,
     triggerSensorFailureScenario,
     triggerNetworkOutageScenario,
@@ -380,19 +387,53 @@ export default function MultiAgentCoordinatorPanel() {
         // STEP 4: ACT -> VERIFY
         if (currentItem.step === 'ACT') {
           setAgentActivity('dispatch', 'Acting', `Dispatching ${currentItem.chosenOption?.name || 'unit'}`);
-          setAgentActivity('herald', 'Acting', `Drafting citizen advisory for ${currentItem.zone}`);
+          setAgentActivity('herald', 'Acting', `Broadcasting emergency alerts for ${currentItem.zone}`);
 
-          // Execute Store Action
+          // FLOOD WORKFLOW (Part 2)
           if (currentItem.type === 'FLOOD' && currentItem.chosenOption?.id) {
+            // 1. Herald pre-evacuates shelters and sends alert
+            const targetZone = riskZones.find(z => currentItem.zone?.includes(z.name) || z.name?.includes(currentItem.zone)) || riskZones[0];
+            const targetCamp = reliefCamps.find(c => c.status === 'ACTIVE') || reliefCamps[0];
+            if (targetZone && targetCamp && preEvacuateShelter) {
+              preEvacuateShelter(targetZone.id, targetCamp.id);
+            }
+
+            // 2. Dispatch stages and sends rescue team
             assignTeamToAlert(currentItem.id, currentItem.chosenOption.id);
-            pushAgentMessage('Dispatch', 'Herald', `${currentItem.chosenOption.name} dispatched to ${currentItem.zone}`);
-            pushAgentMessage('Herald', 'Steward', `Citizen advisory scheduled for ${currentItem.zone}. Created follow-up maintenance task.`);
+            pushAgentMessage('Dispatch', 'Herald', `Rescue team ${currentItem.chosenOption.name} staged and dispatched to ${currentItem.zone} (ETA ${currentItem.chosenOption.etaMinutes || 4}m)`);
+            pushAgentMessage('Herald', 'Citizens', `PUBLIC FLOOD ALERT: Rapid inundation warning in ${currentItem.zone}. Evacuate to ${targetCamp?.name || 'shelter'}.`);
+
+            // 3. Status moves Dispatched (with ETA) -> On Scene -> Returning -> Available
+            const teamId = currentItem.chosenOption.id;
+            setTimeout(() => {
+              if (cycleTeamStatus) cycleTeamStatus(teamId, 'ON SCENE');
+              pushAgentMessage('Dispatch', 'Sentinel', `${currentItem.chosenOption.name} is now ON SCENE at ${currentItem.zone}`);
+            }, 3000);
+            setTimeout(() => {
+              if (cycleTeamStatus) cycleTeamStatus(teamId, 'RETURNING');
+              pushAgentMessage('Dispatch', 'Steward', `${currentItem.chosenOption.name} completed extraction. RETURNING to base.`);
+            }, 6500);
+            setTimeout(() => {
+              if (cycleTeamStatus) cycleTeamStatus(teamId, 'AVAILABLE');
+              pushAgentMessage('Steward', 'Dispatch', `${currentItem.chosenOption.name} returned to base and is now AVAILABLE.`);
+            }, 10000);
+
+          // DRAINAGE WORKFLOW (Part 2)
           } else if (currentItem.type === 'BLOCKAGE') {
+            // 1. Dispatch sends an Inspection Crew first (shown as "Inspection Crew Dispatched" tag on zone card)
+            const targetZone = riskZones.find(z => currentItem.drainNodeId?.includes(z.id.replace('ZONE-', '')) || (currentItem.zone && currentItem.zone.includes(z.name))) || riskZones[0];
+            if (targetZone && dispatchInspectionCrew) {
+              dispatchInspectionCrew(targetZone.id);
+            }
+            pushAgentMessage('Dispatch', 'Sentinel', `Inspection Crew Dispatched to ${currentItem.drainNodeId} to evaluate trash rack debris.`);
+
+            // 2. Dispatch sends matched cleaning crew
             assignWorkerToBlockage(currentItem.drainNodeId, currentItem.chosenOption?.id);
-            pushAgentMessage('Dispatch', 'Steward', `${currentItem.chosenOption?.name || 'Municipal Crew'} assigned to ${currentItem.drainNodeId}`);
+            pushAgentMessage('Dispatch', 'Steward', `Matched ${currentItem.chosenOption?.name || 'Drainage Crew'} deployed with ${currentItem.chosenOption?.equipment || 'specialized equipment'}.`);
+
           } else if (currentItem.type === 'SENSOR_FAULT') {
             restorePrimarySensor(currentItem.drainNodeId);
-            pushAgentMessage('Sentinel', 'Steward', `Backup sensor verified active on ${currentItem.drainNodeId}`);
+            pushAgentMessage('Sentinel', 'Steward', `Backup sensor verified active on ${currentItem.drainNodeId}.`);
           }
 
           currentItem.actTimestamp = new Date().toLocaleTimeString();
@@ -404,7 +445,7 @@ export default function MultiAgentCoordinatorPanel() {
             teamName: currentItem.chosenOption?.name,
             alertId: currentItem.type === 'FLOOD' ? currentItem.id : null,
             drainId: currentItem.drainNodeId,
-            description: `${currentItem.chosenOption?.name || 'Resource'} assigned to ${currentItem.zone}`
+            description: `${currentItem.chosenOption?.name || 'Resource'} deployed to ${currentItem.zone}`
           });
 
           return [
@@ -416,8 +457,28 @@ export default function MultiAgentCoordinatorPanel() {
 
         // STEP 5: VERIFY -> DONE
         if (currentItem.step === 'VERIFY') {
-          setAgentActivity('steward', 'Acting', 'Verifying state synchronization across store');
-          pushAgentMessage('Steward', 'Sentinel', `Result confirmed: Target state synchronized across all 6 tabs.`);
+          setAgentActivity('steward', 'Acting', 'Verifying clearance & synchronizing store state');
+
+          // DRAINAGE WORKFLOW: Blockage % drops after clearing (87% -> 40% -> 10%)
+          if (currentItem.type === 'BLOCKAGE' && animateDrainClearing) {
+            animateDrainClearing(currentItem.drainNodeId);
+            pushAgentMessage('Steward', 'Sentinel', `VERIFY: ${currentItem.drainNodeId} blockage clearing verified (87% -> 40% -> 10%). Risk badge normalized.`);
+          }
+
+          // FLOOD WORKFLOW: Herald schedules follow-up awareness campaign
+          if (currentItem.type === 'FLOOD' && scheduleAwarenessCampaign) {
+            scheduleAwarenessCampaign({
+              zone: currentItem.zone,
+              title: `Post-Storm Citizen Drainage Hygiene & Readiness Drive`,
+              scheduledDate: 'Tomorrow, 09:30 AM',
+              targetHouseholds: 1800,
+              linkedAlertId: currentItem.id,
+              channel: 'Mobile PA Van & SMS Alert'
+            });
+            pushAgentMessage('Herald', 'Steward', `Follow-up awareness campaign scheduled for ${currentItem.zone}.`);
+          }
+
+          pushAgentMessage('Steward', 'Dispatch', `Verification complete: Store counters and tab states synchronized.`);
 
           currentItem.verifyData = {
             status: 'VERIFIED_ACTIVE',
@@ -426,7 +487,7 @@ export default function MultiAgentCoordinatorPanel() {
           };
 
           // STEP 6: REPORT to Activity Log
-          const plainReason = `${currentItem.chosenOption?.name || 'Unit'} assigned to ${currentItem.zone}: ${currentItem.reasonText || 'Highest scoring match'}`;
+          const plainReason = `${currentItem.chosenOption?.name || 'Unit'} assigned to ${currentItem.zone}: ${currentItem.reasonText || 'Optimal rule match'}`;
           addActivity(
             currentItem.type === 'FLOOD' ? 'RESCUE_DISPATCHED' : 'BLOCKAGE_ASSIGNED',
             plainReason,
@@ -459,7 +520,24 @@ export default function MultiAgentCoordinatorPanel() {
     }, 900); // 900ms visible delay between steps
 
     return () => clearInterval(timer);
-  }, [isAgentActive, autonomyMode, rescueTeams, assignTeamToAlert, assignWorkerToBlockage, restorePrimarySensor, addActivity, setAgentActivity, pushAgentMessage]);
+  }, [
+    isAgentActive,
+    autonomyMode,
+    rescueTeams,
+    riskZones,
+    reliefCamps,
+    assignTeamToAlert,
+    assignWorkerToBlockage,
+    restorePrimarySensor,
+    addActivity,
+    setAgentActivity,
+    pushAgentMessage,
+    preEvacuateShelter,
+    dispatchInspectionCrew,
+    animateDrainClearing,
+    scheduleAwarenessCampaign,
+    cycleTeamStatus
+  ]);
 
   // ---------------------------------------------------------------------------
   // Approve / Reject / Edit Handlers for Proposed Actions (Approve First Mode)
