@@ -9,7 +9,7 @@
     "start": "vite preview",
     "lint": "oxlint",
     "check:keys": "node scripts/check-keys.js",
-    "test": "node scripts/check-keys.js",
+    "test": "node scripts/test-all-files.js",
     "test:e2e": "node scripts/check-keys.js",
     "analyze": "vite build",
     "preview": "vite preview"

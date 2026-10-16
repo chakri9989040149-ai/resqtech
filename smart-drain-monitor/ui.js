@@ -5,6 +5,7 @@
  * Handles DOM updates, HTML5 Canvas live line chart rendering,
  * dynamic SVG drain cross-section rendering, user controls, and event logging.
  * ============================================================================
+ */
 (function () {
   'use strict';
 

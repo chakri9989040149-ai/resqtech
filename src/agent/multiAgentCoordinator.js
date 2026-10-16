@@ -345,7 +345,7 @@ export function answerAgentQuestion(question, store) {
 
     return `[SIMULATED AI AGENT RESPONSE]
 Current Team Availability Matrix:
-• Available Rescue Teams (${freeRescue.length}/${rescueTeams.filter(t => t.type !== 'CLEANING').length}): ${freeRescue.map(t => `${t.name} (${t.equipment})`).join('; ') || 'None (all active)'}
+• Available Rescue Teams (${freeRescue.length}/${rescueTeams.filter(t => t.type !== 'CLEANING').length}): ${freeRescue.map(t => `${t.name} (${t.status}${t.equipment ? ` - ${t.equipment}` : ''})`).join('; ') || 'None (all active)'}
 • Available Drainage Crews (${freeCleaning.length}/${rescueTeams.filter(t => t.type === 'CLEANING').length}): ${freeCleaning.map(c => `${c.name} [Specialty: ${c.specialty}]`).join('; ') || 'All deployed'}
 • Active Field Units (${busyTeams.length}): ${busyTeams.map(b => `${b.name} (${b.status}${b.etaMinutes ? ` - ETA ${b.etaMinutes}m` : ''})`).join('; ') || 'Depot reserve ready'}
 Dispatch monitors all units in real time to prevent double-booking.`;
@@ -409,3 +409,15 @@ Sentinel Sensor Monitoring Report:
   return `[SIMULATED AI AGENT RESPONSE]
 SensaFlow Multi-Agent Assistant standing by. Tracking 6 IoT drain nodes (NODE-C-08 through NODE-D-07), 4 rescue units, and 3 specialized drainage crews. You can ask: "Which teams are free?", "What is the highest risk now?", or "Summarize this shift".`;
 }
+
+// Canonical Workflow Stages
+export const WORKFLOW_STAGES = ['PERCEIVE', 'REASON', 'PLAN', 'ACT', 'VERIFY', 'DONE'];
+
+// Agent Specifications dictionary
+export const AGENT_SPECS = Object.fromEntries(
+  INITIAL_AGENTS.map(agent => [agent.id, agent])
+);
+
+// Alias for question answering
+export const generateSimulatedResponse = answerAgentQuestion;
+

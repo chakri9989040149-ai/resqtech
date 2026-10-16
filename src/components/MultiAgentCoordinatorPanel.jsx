@@ -692,11 +692,11 @@ export default function MultiAgentCoordinatorPanel() {
                   borderRadius: '4px',
                   padding: '1px 6px',
                   fontSize: '9px',
-                  fontWeight: 800,
-                  letterSpacing: '0.05em'
+                  fontWeight: 800
                 }}
+                title="Simulated AI Agent"
               >
-                SIMULATED AI AGENT
+                Simulated AI Agent
               </span>
               <span
                 style={{

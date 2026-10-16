@@ -420,3 +420,39 @@ export async function authenticateEmployee({
 export function getAuditLogs() {
   return [...auditLedger];
 }
+
+export const loginUser = authenticateEmployee;
+
+export function validateCredentials(identifier, password) {
+  if (!identifier || !password) return null;
+  const cleanId = identifier.trim().toLowerCase();
+  if (cleanId === 'admin@resqtech.gov.in' && password === 'Admin@1234') {
+    return {
+      email: 'admin@resqtech.gov.in',
+      role: 'SUPER_ADMIN',
+      name: 'System Administrator'
+    };
+  }
+  const found = DEMO_ACCOUNTS.find(
+    acc => acc.email.toLowerCase() === cleanId || acc.employeeId.toLowerCase() === cleanId
+  );
+  if (found && password === DEMO_PASSWORD) {
+    return {
+      ...found,
+      role: 'OFFICER'
+    };
+  }
+  return null;
+}
+
+export function getStoredSession() {
+  try {
+    const raw = typeof localStorage !== 'undefined' 
+      ? (localStorage.getItem('sensaflow_auth_session') || localStorage.getItem('floodguard_auth_session'))
+      : null;
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+

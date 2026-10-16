@@ -89,7 +89,9 @@ export default function DashboardPage() {
     toggleDrainMute,
     stageTeamAtRiskZone,
     openCampForRiskZone,
+    preEvacuateShelter,
     markZoneSecured,
+    deployFloodBarriers,
     triggerSendAlertForArea,
     isOutageActive,
     loraQueue,
@@ -3093,7 +3095,7 @@ export default function DashboardPage() {
                   <button
                     onClick={() => {
                       if (selectedZoneCamp) {
-                        openCampForRiskZone(activeZoneModal.id, selectedZoneCamp);
+                        preEvacuateShelter(activeZoneModal.id, selectedZoneCamp);
                         setActiveZoneModal(null);
                       }
                     }}
@@ -3173,7 +3175,7 @@ export default function DashboardPage() {
                 </div>
                 <button
                   onClick={() => {
-                    markZoneSecured(activeZoneModal.id);
+                    deployFloodBarriers(activeZoneModal.id);
                     setActiveZoneModal(null);
                   }}
                   style={{
